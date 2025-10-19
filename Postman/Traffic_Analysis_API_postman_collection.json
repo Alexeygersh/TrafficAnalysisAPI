@@ -1,0 +1,859 @@
+{
+	"info": {
+		"_postman_id": "9d080b6c-531b-44a8-858a-09a1ed6d453c",
+		"name": "Traffic Analysis API",
+		"description": "Коллекция для тестирования API анализа сетевого трафика",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "49206081",
+		"_collection_link": "https://alexeygersh-1960011.postman.co/workspace/Alexey's-Workspace~e092fa78-2319-4873-84c2-665e30c2e2e6/collection/49206081-9d080b6c-531b-44a8-858a-09a1ed6d453c?action=share&source=collection_link&creator=49206081"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login as Admin",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"pm.collectionVariables.set(\"token\", jsonData.token);"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"admin\",\n  \"password\": \"Admin123!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login as Analyst",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"username\": \"analyst\",\r\n  \"password\": \"Analyst123!\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Packets",
+			"item": [
+				{
+					"name": "Get All Packets",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Packets",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Packets"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Packet by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Packets/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Packets",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Packet (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sourceIP\": \"192.168.1.100\",\n  \"destinationIP\": \"8.8.8.8\",\n  \"port\": 443,\n  \"protocol\": \"TCP\",\n  \"packetSize\": 1024,\n  \"sessionId\": 1\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Packets",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Packets"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Suspicious Packet",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sourceIP\": \"45.142.120.10\",\n  \"destinationIP\": \"192.168.1.5\",\n  \"port\": 3389,\n  \"protocol\": \"TCP\",\n  \"packetSize\": 2048,\n  \"timestamp\": \"2025-09-30T10:05:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Packets",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Packets"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Threat Score",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Packets/threat-score/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Packets",
+								"threat-score",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Packet (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Packets/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Packets",
+								"1"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Analysis",
+			"item": [
+				{
+					"name": "Get All Analyses",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Analysis",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Analysis"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Analysis (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"packetId\": 1,\n  \"mlModelScore\": 0.85,\n  \"description\": \"Обнаружена подозрительная активность\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Analysis",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Analysis"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Analysis Report",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Analysis/report/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Analysis",
+								"report",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update ML Confidence",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "0.92"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Analysis/update-confidence/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Analysis",
+								"update-confidence",
+								"1"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Sessions",
+			"item": [
+				{
+					"name": "Get All Sessions",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Sessions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Sessions"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Session (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sessionName\": \"Test Postman Session\",\n  \"description\": \"Тестовая сессия\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Sessions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Sessions"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Session Statistics",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Sessions/statistics/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Sessions",
+								"statistics",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Anomalous Packets",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Sessions/anomalous-packets/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Sessions",
+								"anomalous-packets",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Close Session",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Sessions/close/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Sessions",
+								"close",
+								"1"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Reports (LINQ)",
+			"item": [
+				{
+					"name": "1. Suspicious Packets",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Reports/suspicious-packets",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Reports",
+								"suspicious-packets"
+							]
+						},
+						"description": "LINQ: Where, Select, OrderByDescending"
+					},
+					"response": []
+				},
+				{
+					"name": "2. Threats by Protocol",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Reports/threats-by-protocol",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Reports",
+								"threats-by-protocol"
+							]
+						},
+						"description": "LINQ: Where, GroupBy, Select, Count, Average"
+					},
+					"response": []
+				},
+				{
+					"name": "3. Top Malicious IPs",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Reports/top-malicious-ips?top=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Reports",
+								"top-malicious-ips"
+							],
+							"query": [
+								{
+									"key": "top",
+									"value": "10"
+								}
+							]
+						},
+						"description": "LINQ: Where, GroupBy, Select, Max, Take, Distinct"
+					},
+					"response": []
+				},
+				{
+					"name": "4. Source History",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Reports/source-history/192.168.1.100",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Reports",
+								"source-history",
+								"192.168.1.100"
+							]
+						},
+						"description": "LINQ: Where, Select, Distinct, Min, Max, Count"
+					},
+					"response": []
+				},
+				{
+					"name": "5. Time-Based Summary",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Reports/time-based-summary?hours=24",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Reports",
+								"time-based-summary"
+							],
+							"query": [
+								{
+									"key": "hours",
+									"value": "24"
+								}
+							]
+						},
+						"description": "LINQ: Where, GroupBy, Select, OrderByDescending, Take"
+					},
+					"response": []
+				},
+				{
+					"name": "6. Session Detailed Report",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Reports/session-detailed/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Reports",
+								"session-detailed",
+								"1"
+							]
+						},
+						"description": "LINQ: Where, GroupBy, Select, OrderByDescending"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Test 401 Unauthorized",
+			"item": [
+				{
+					"name": "Get Packets Without Token (401)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/Packets",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Packets"
+							]
+						},
+						"description": "Должен вернуть 401 Unauthorized"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Test 403 Forbidden",
+			"item": [
+				{
+					"name": "Create Packet as Analyst (403)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"sourceIP\": \"10.0.0.1\",\n  \"destinationIP\": \"10.0.0.2\",\n  \"port\": 80,\n  \"protocol\": \"TCP\",\n  \"packetSize\": 512\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/Packets",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"Packets"
+							]
+						},
+						"description": "Сначала залогиньтесь как Analyst, затем попробуйте создать пакет. Должен вернуть 403 Forbidden"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://localhost:7000",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
