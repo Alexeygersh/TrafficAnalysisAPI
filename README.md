@@ -39,7 +39,7 @@ CREATE DATABASE TrafficAnalysisDB;
 }
 ```
 
-## Шаг 3: Установка пакетов
+### 3. Установка пакетов
 
 ```bash
 dotnet add package Microsoft.EntityFrameworkCore
