@@ -1,8 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using TrafficAnalysisAPI.Data;
-using TrafficAnalysisAPI.Models;
+using TrafficAnalysisAPI.DTOs;
+using TrafficAnalysisAPI.Services.Interfaces;
 
 namespace TrafficAnalysisAPI.Controllers
 {
@@ -10,129 +9,121 @@ namespace TrafficAnalysisAPI.Controllers
     [ApiController]
     public class AnalysisController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IAnalysisService _analysisService;
+        private readonly ILogger<AnalysisController> _logger;
 
-        public AnalysisController(ApplicationDbContext context)
+        public AnalysisController(IAnalysisService analysisService, ILogger<AnalysisController> logger)
         {
-            _context = context;
+            _analysisService = analysisService;
+            _logger = logger;
         }
 
-        // GET: api/Analysis
         [HttpGet]
         [Authorize(Policy = "AuthorizedUser")]
-        public async Task<ActionResult<IEnumerable<TrafficAnalysis>>> GetAnalyses()
+        [ProducesResponseType(typeof(IEnumerable<AnalysisDto>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<IEnumerable<AnalysisDto>>> GetAnalyses()
         {
-            return await _context.TrafficAnalyses
-                .Include(a => a.Packet)
-                .ToListAsync();
+            var analyses = await _analysisService.GetAllAnalysesAsync();
+            return Ok(analyses);
         }
 
-        // GET: api/Analysis/5
         [HttpGet("{id}")]
         [Authorize(Policy = "AuthorizedUser")]
-        public async Task<ActionResult<TrafficAnalysis>> GetAnalysis(int id)
+        [ProducesResponseType(typeof(AnalysisDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<AnalysisDto>> GetAnalysis(int id)
         {
-            var analysis = await _context.TrafficAnalyses
-                .Include(a => a.Packet)
-                .FirstOrDefaultAsync(a => a.Id == id);
+            var analysis = await _analysisService.GetAnalysisByIdAsync(id);
 
             if (analysis == null)
-                return NotFound();
+                return NotFound(new { message = $"Анализ с ID {id} не найден" });
 
-            return analysis;
+            return Ok(analysis);
         }
 
-        // POST: api/Analysis - создать анализ (только админы)
         [HttpPost]
         [Authorize(Policy = "AdminOnly")]
-        public async Task<ActionResult<TrafficAnalysis>> CreateAnalysis(TrafficAnalysis analysis)
+        [ProducesResponseType(typeof(AnalysisDto), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<AnalysisDto>> CreateAnalysis([FromBody] CreateAnalysisDto dto)
         {
-            // Автоматическая классификация при создании
-            analysis.ClassifyThreat();
-
-            _context.TrafficAnalyses.Add(analysis);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetAnalysis), new { id = analysis.Id }, analysis);
-        }
-
-        // PUT: api/Analysis/5
-        [HttpPut("{id}")]
-        [Authorize(Policy = "AdminOnly")]
-        public async Task<IActionResult> UpdateAnalysis(int id, TrafficAnalysis analysis)
-        {
-            if (id != analysis.Id)
-                return BadRequest();
-
-            _context.Entry(analysis).State = EntityState.Modified;
-
             try
             {
-                await _context.SaveChangesAsync();
+                var analysis = await _analysisService.CreateAnalysisAsync(dto);
+                return CreatedAtAction(nameof(GetAnalysis), new { id = analysis.Id }, analysis);
             }
-            catch (DbUpdateConcurrencyException)
+            catch (ArgumentException ex)
             {
-                if (!AnalysisExists(id))
-                    return NotFound();
-                throw;
+                return BadRequest(new { message = ex.Message });
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating analysis");
+                return BadRequest(new { message = "Ошибка при создании анализа" });
+            }
+        }
+
+        [HttpPut("{id}")]
+        [Authorize(Policy = "AdminOnly")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UpdateAnalysis(int id, [FromBody] CreateAnalysisDto dto)
+        {
+            var success = await _analysisService.UpdateAnalysisAsync(id, dto);
+
+            if (!success)
+                return NotFound(new { message = $"Анализ с ID {id} не найден" });
 
             return NoContent();
         }
 
-        // DELETE: api/Analysis/5
         [HttpDelete("{id}")]
         [Authorize(Policy = "AdminOnly")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteAnalysis(int id)
         {
-            var analysis = await _context.TrafficAnalyses.FindAsync(id);
-            if (analysis == null)
-                return NotFound();
+            var success = await _analysisService.DeleteAnalysisAsync(id);
 
-            _context.TrafficAnalyses.Remove(analysis);
-            await _context.SaveChangesAsync();
+            if (!success)
+                return NotFound(new { message = $"Анализ с ID {id} не найден" });
 
             return NoContent();
         }
 
-        // GET: api/Analysis/report/5 - получить отчет по анализу
         [HttpGet("report/{id}")]
         [Authorize(Policy = "AuthorizedUser")]
-        public async Task<ActionResult<string>> GetReport(int id)
+        [ProducesResponseType(typeof(AnalysisReportDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<AnalysisReportDto>> GetReport(int id)
         {
-            var analysis = await _context.TrafficAnalyses
-                .Include(a => a.Packet)
-                .FirstOrDefaultAsync(a => a.Id == id);
+            var report = await _analysisService.GetAnalysisReportAsync(id);
 
-            if (analysis == null)
-                return NotFound();
+            if (report == null)
+                return NotFound(new { message = $"Анализ с ID {id} не найден" });
 
-            return Ok(new { report = analysis.GenerateReport() });
+            return Ok(report);
         }
 
-        // POST: api/Analysis/update-confidence/5 - обновить уверенность модели
         [HttpPost("update-confidence/{id}")]
         [Authorize(Policy = "AdminOnly")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> UpdateConfidence(int id, [FromBody] double newScore)
         {
-            var analysis = await _context.TrafficAnalyses.FindAsync(id);
-            if (analysis == null)
-                return NotFound();
+            var success = await _analysisService.UpdateConfidenceAsync(id, newScore);
 
-            analysis.UpdateConfidence(newScore);
-            await _context.SaveChangesAsync();
+            if (!success)
+                return NotFound(new { message = $"Анализ с ID {id} не найден" });
+
+            var analysis = await _analysisService.GetAnalysisByIdAsync(id);
 
             return Ok(new
             {
                 message = "Уверенность модели обновлена",
-                newMLScore = analysis.MLModelScore,
+                newMLScore = analysis!.MLModelScore,
                 threatLevel = analysis.ThreatLevel
             });
-        }
-
-        private bool AnalysisExists(int id)
-        {
-            return _context.TrafficAnalyses.Any(e => e.Id == id);
         }
     }
 }

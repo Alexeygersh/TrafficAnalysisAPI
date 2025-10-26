@@ -1,8 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using TrafficAnalysisAPI.Data;
-using TrafficAnalysisAPI.Models;
+using TrafficAnalysisAPI.DTOs;
+using TrafficAnalysisAPI.Services.Interfaces;
 
 namespace TrafficAnalysisAPI.Controllers
 {
@@ -10,139 +9,127 @@ namespace TrafficAnalysisAPI.Controllers
     [ApiController]
     public class SessionsController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly ISessionService _sessionService;
+        private readonly ILogger<SessionsController> _logger;
 
-        public SessionsController(ApplicationDbContext context)
+        public SessionsController(ISessionService sessionService, ILogger<SessionsController> logger)
         {
-            _context = context;
+            _sessionService = sessionService;
+            _logger = logger;
         }
 
-        // GET: api/Sessions
         [HttpGet]
         [Authorize(Policy = "AuthorizedUser")]
-        public async Task<ActionResult<IEnumerable<TrafficSession>>> GetSessions()
+        [ProducesResponseType(typeof(IEnumerable<SessionDto>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<IEnumerable<SessionDto>>> GetSessions()
         {
-            return await _context.TrafficSessions
-                .Include(s => s.Packets)
-                .ToListAsync();
+            var sessions = await _sessionService.GetAllSessionsAsync();
+            return Ok(sessions);
         }
 
-        // GET: api/Sessions/5
         [HttpGet("{id}")]
         [Authorize(Policy = "AuthorizedUser")]
-        public async Task<ActionResult<TrafficSession>> GetSession(int id)
+        [ProducesResponseType(typeof(SessionDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<SessionDto>> GetSession(int id)
         {
-            var session = await _context.TrafficSessions
-                .Include(s => s.Packets)
-                .FirstOrDefaultAsync(s => s.Id == id);
+            var session = await _sessionService.GetSessionByIdAsync(id);
 
             if (session == null)
-                return NotFound();
+                return NotFound(new { message = $"Сессия с ID {id} не найдена" });
 
-            return session;
+            return Ok(session);
         }
 
-        // POST: api/Sessions
         [HttpPost]
         [Authorize(Policy = "AdminOnly")]
-        public async Task<ActionResult<TrafficSession>> CreateSession(TrafficSession session)
+        [ProducesResponseType(typeof(SessionDto), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<SessionDto>> CreateSession([FromBody] CreateSessionDto dto)
         {
-            _context.TrafficSessions.Add(session);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetSession), new { id = session.Id }, session);
-        }
-
-        // PUT: api/Sessions/5
-        [HttpPut("{id}")]
-        [Authorize(Policy = "AdminOnly")]
-        public async Task<IActionResult> UpdateSession(int id, TrafficSession session)
-        {
-            if (id != session.Id)
-                return BadRequest();
-
-            _context.Entry(session).State = EntityState.Modified;
-
             try
             {
-                await _context.SaveChangesAsync();
+                var session = await _sessionService.CreateSessionAsync(dto);
+                return CreatedAtAction(nameof(GetSession), new { id = session.Id }, session);
             }
-            catch (DbUpdateConcurrencyException)
+            catch (Exception ex)
             {
-                if (!SessionExists(id))
-                    return NotFound();
-                throw;
+                _logger.LogError(ex, "Error creating session");
+                return BadRequest(new { message = "Ошибка при создании сессии" });
             }
+        }
+
+        [HttpPut("{id}")]
+        [Authorize(Policy = "AdminOnly")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> UpdateSession(int id, [FromBody] CreateSessionDto dto)
+        {
+            var success = await _sessionService.UpdateSessionAsync(id, dto);
+
+            if (!success)
+                return NotFound(new { message = $"Сессия с ID {id} не найдена" });
 
             return NoContent();
         }
 
-        // DELETE: api/Sessions/5
         [HttpDelete("{id}")]
         [Authorize(Policy = "AdminOnly")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteSession(int id)
         {
-            var session = await _context.TrafficSessions.FindAsync(id);
-            if (session == null)
-                return NotFound();
+            var success = await _sessionService.DeleteSessionAsync(id);
 
-            _context.TrafficSessions.Remove(session);
-            await _context.SaveChangesAsync();
+            if (!success)
+                return NotFound(new { message = $"Сессия с ID {id} не найдена" });
 
             return NoContent();
         }
 
-        // GET: api/Sessions/statistics/5
         [HttpGet("statistics/{id}")]
         [Authorize(Policy = "AuthorizedUser")]
-        public async Task<ActionResult<Dictionary<string, object>>> GetStatistics(int id)
+        [ProducesResponseType(typeof(SessionStatisticsDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<SessionStatisticsDto>> GetStatistics(int id)
         {
-            var session = await _context.TrafficSessions
-                .Include(s => s.Packets)
-                .FirstOrDefaultAsync(s => s.Id == id);
+            var stats = await _sessionService.GetSessionStatisticsAsync(id);
 
-            if (session == null)
-                return NotFound();
+            if (stats == null)
+                return NotFound(new { message = $"Сессия с ID {id} не найдена" });
 
-            return Ok(session.CalculateStatistics());
+            return Ok(stats);
         }
 
-        // GET: api/Sessions/anomalous-packets/5
         [HttpGet("anomalous-packets/{id}")]
         [Authorize(Policy = "AuthorizedUser")]
-        public async Task<ActionResult<IEnumerable<NetworkPacket>>> GetAnomalousPackets(int id)
+        [ProducesResponseType(typeof(IEnumerable<PacketDto>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<IEnumerable<PacketDto>>> GetAnomalousPackets(int id)
         {
-            var session = await _context.TrafficSessions
-                .Include(s => s.Packets)
-                .FirstOrDefaultAsync(s => s.Id == id);
-
-            if (session == null)
-                return NotFound();
-
-            return Ok(session.GetAnomalousPackets());
+            var packets = await _sessionService.GetAnomalousPacketsAsync(id);
+            return Ok(packets);
         }
 
-        // POST: api/Sessions/close/5
         [HttpPost("close/{id}")]
         [Authorize(Policy = "AdminOnly")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> CloseSession(int id)
         {
-            var session = await _context.TrafficSessions.FindAsync(id);
-            if (session == null)
-                return NotFound();
+            try
+            {
+                var success = await _sessionService.CloseSessionAsync(id);
 
-            if (session.EndTime.HasValue)
-                return BadRequest(new { message = "Сессия уже завершена" });
+                if (!success)
+                    return NotFound(new { message = $"Сессия с ID {id} не найдена" });
 
-            session.EndTime = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Сессия успешно завершена" });
-        }
-
-        private bool SessionExists(int id)
-        {
-            return _context.TrafficSessions.Any(e => e.Id == id);
+                return Ok(new { message = "Сессия успешно завершена" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
     }
 }
