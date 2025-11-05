@@ -3,7 +3,7 @@
     public class CreateAnalysisDto
     {
         public int PacketId { get; set; }
-        public double MLModelScore { get; set; }
+        public double? MLModelScore { get; set; }
         public string? Description { get; set; }
     }
 

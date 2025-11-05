@@ -44,10 +44,24 @@ namespace TrafficAnalysisAPI.Services.Implementations
             if (!packetExists)
                 throw new ArgumentException($"Пакет с ID {dto.PacketId} не существует");
 
+            // Проверка на существующий анализ
+            var existingAnalysis = await _context.TrafficAnalyses
+                .Include(a => a.Packet)
+                .FirstOrDefaultAsync(a => a.PacketId == dto.PacketId);
+
+            if (existingAnalysis != null)
+            {
+                _logger.LogInformation($"Analysis for packet {dto.PacketId} already exists (ID: {existingAnalysis.Id}). Returning existing analysis.");
+                return MapToDto(existingAnalysis);
+            }
+
+            // Получаем score (потом будет из python)
+            double mlScore = dto.MLModelScore ?? await GetMLScoreStub(dto.PacketId);
+
             var analysis = new TrafficAnalysis
             {
                 PacketId = dto.PacketId,
-                MLModelScore = dto.MLModelScore,
+                MLModelScore = mlScore,
                 Description = dto.Description,
                 DetectedAt = DateTime.UtcNow
             };
@@ -70,7 +84,7 @@ namespace TrafficAnalysisAPI.Services.Implementations
             if (analysis == null) return false;
 
             analysis.PacketId = dto.PacketId;
-            analysis.MLModelScore = dto.MLModelScore;
+            analysis.MLModelScore = dto.MLModelScore ?? analysis.MLModelScore;
             analysis.Description = dto.Description;
 
             // Перерасчет классификации
@@ -134,6 +148,33 @@ namespace TrafficAnalysisAPI.Services.Implementations
             _logger.LogInformation($"Updated confidence for analysis {id}: new ML score = {analysis.MLModelScore:F2}");
 
             return true;
+        }
+
+        // -=--=--=-=--=-=-=-=-=-=-=
+        // Заглушка для ML-скора
+        // =-=-=-=-=---=-=-=-=-=-=-
+        private async Task<double> GetMLScoreStub(int packetId)
+        {
+            var packet = await _context.NetworkPackets.FindAsync(packetId);
+
+            if (packet == null)
+                return 0.5; // Средний риск по умолчанию
+
+            // большие пакеты = выше риск
+            double baseScore = 0.3;
+
+            if (packet.PacketSize > 1500)
+                baseScore += 0.2;
+
+            if (packet.Protocol == "TCP")
+                baseScore += 0.1;
+
+            var random = new Random();
+            baseScore += random.NextDouble() * 0.2;
+
+            _logger.LogInformation($"ML Score stub for packet {packetId}: {baseScore:F2}");
+
+            return Math.Min(baseScore, 1.0); // <= 1.0
         }
 
         // Бизнес-логика: классификация угрозы

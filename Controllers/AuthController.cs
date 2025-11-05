@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using BCrypt.Net;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -6,7 +7,7 @@ using System.Security.Claims;
 using System.Text;
 using TrafficAnalysisAPI.Data;
 using TrafficAnalysisAPI.Models;
-using BCrypt.Net;
+using TrafficAnalysisAPI.Services.Interfaces;
 
 namespace TrafficAnalysisAPI.Controllers
 {
@@ -14,16 +15,16 @@ namespace TrafficAnalysisAPI.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IAuthService _authService;
         private readonly IConfiguration _configuration;
         private readonly ILogger<AuthController> _logger;
 
         public AuthController(
-            ApplicationDbContext context,
+            IAuthService authService,
             IConfiguration configuration,
             ILogger<AuthController> logger)
         {
-            _context = context;
+            _authService = authService;
             _configuration = configuration;
             _logger = logger;
         }
@@ -67,9 +68,8 @@ namespace TrafficAnalysisAPI.Controllers
 
             try
             {
-                // Поиск пользователя в базе данных
-                var user = await _context.Users
-                    .FirstOrDefaultAsync(u => u.Username == request.Username);
+                // Поиск пользователя через сервис
+                var user = await _authService.GetUserByUsernameAsync(request.Username);
 
                 if (user == null)
                 {
@@ -77,8 +77,8 @@ namespace TrafficAnalysisAPI.Controllers
                     return Unauthorized(new { message = "Неверный логин или пароль" });
                 }
 
-                // Проверка пароля через BCrypt
-                bool isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+                // Проверка пароля через сервис
+                bool isPasswordValid = _authService.VerifyPassword(request.Password, user.PasswordHash);
 
                 if (!isPasswordValid)
                 {
@@ -130,31 +130,19 @@ namespace TrafficAnalysisAPI.Controllers
 
             try
             {
-                // Проверка существования пользователя
-                var existingUser = await _context.Users
-                    .FirstOrDefaultAsync(u => u.Username == request.Username);
+                // Проверка существования пользователя через сервис
+                var userExists = await _authService.UserExistsAsync(request.Username);
 
-                if (existingUser != null)
+                if (userExists)
                 {
                     return BadRequest(new { message = "Пользователь с таким именем уже существует" });
                 }
 
-                // Хеширование пароля
-                string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
-
-                // Создание нового пользователя
-                var newUser = new User
-                {
-                    Username = request.Username,
-                    PasswordHash = passwordHash,
-                    Role = request.Role,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                _context.Users.Add(newUser);
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation($"New user registered: {newUser.Username} with role {newUser.Role}");
+                // Создание нового пользователя через сервис
+                var newUser = await _authService.CreateUserAsync(
+                    request.Username,
+                    request.Password,
+                    request.Role);
 
                 // Генерация токена для нового пользователя
                 var token = GenerateJwtToken(newUser);
@@ -216,7 +204,7 @@ namespace TrafficAnalysisAPI.Controllers
             }
 
             var userId = int.Parse(userIdClaim.Value);
-            var user = await _context.Users.FindAsync(userId);
+            var user = await _authService.GetUserByIdAsync(userId);
 
             if (user == null)
             {
