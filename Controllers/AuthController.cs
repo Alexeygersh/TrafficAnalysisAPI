@@ -1,13 +1,12 @@
-﻿using BCrypt.Net;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using TrafficAnalysisAPI.Data;
 using TrafficAnalysisAPI.Models;
 using TrafficAnalysisAPI.Services.Interfaces;
+using TrafficAnalysisAPI.DTOs.Auth;
 
 namespace TrafficAnalysisAPI.Controllers
 {
@@ -29,35 +28,11 @@ namespace TrafficAnalysisAPI.Controllers
             _logger = logger;
         }
 
-        // запрос авторизации
-        public class LoginRequest
-        {
-            public string Username { get; set; }
-            public string Password { get; set; }
-        }
-
-        // ответ с токеном
-        public class LoginResponse
-        {
-            public string Token { get; set; }
-            public string Username { get; set; }
-            public string Role { get; set; }
-        }
-
-        // регистрация
-        public class RegisterRequest
-        {
-            public string Username { get; set; }
-            public string Password { get; set; }
-            public string Role { get; set; } // "Admin" или "Analyst"
-        }
-
         // Авторизация пользователя
-        // ---> JWT
         [HttpPost("login")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(LoginResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request)
+        public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginRequestDTO request)
         {
             // Валидация входных данных
             if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
@@ -91,7 +66,7 @@ namespace TrafficAnalysisAPI.Controllers
 
                 _logger.LogInformation($"User {user.Username} logged in successfully");
 
-                return Ok(new LoginResponse
+                return Ok(new LoginResponseDto
                 {
                     Token = token,
                     Username = user.Username,
@@ -107,25 +82,16 @@ namespace TrafficAnalysisAPI.Controllers
 
         // Регистрация нового пользователя (только для админов)
         [HttpPost("register")]
-        [ProducesResponseType(StatusCodes.Status201Created)]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(typeof(LoginResponseDto), StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<LoginResponse>> Register([FromBody] RegisterRequest request)
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<ActionResult<LoginResponseDto>> Register([FromBody] RegisterRequestDto request)
         {
-            // Валидация
-            if (string.IsNullOrWhiteSpace(request.Username) ||
-                string.IsNullOrWhiteSpace(request.Password))
+            // Валидация через DataAnnotations происходит автоматически
+            if (!ModelState.IsValid)
             {
-                return BadRequest(new { message = "Логин и пароль обязательны" });
-            }
-
-            if (request.Password.Length < 6)
-            {
-                return BadRequest(new { message = "Пароль должен быть минимум 6 символов" });
-            }
-
-            if (request.Role != "Admin" && request.Role != "Analyst")
-            {
-                return BadRequest(new { message = "Роль должна быть Admin или Analyst" });
+                return BadRequest(ModelState);
             }
 
             try
@@ -144,12 +110,15 @@ namespace TrafficAnalysisAPI.Controllers
                     request.Password,
                     request.Role);
 
+                _logger.LogInformation($"Admin {User.Identity?.Name} created new user: {newUser.Username}");
+
                 // Генерация токена для нового пользователя
                 var token = GenerateJwtToken(newUser);
 
                 return CreatedAtAction(
-                    nameof(Login),
-                    new LoginResponse
+                    nameof(GetCurrentUser),
+                    new { id = newUser.Id },
+                    new LoginResponseDto
                     {
                         Token = token,
                         Username = newUser.Username,
@@ -163,38 +132,12 @@ namespace TrafficAnalysisAPI.Controllers
             }
         }
 
-        // Генерация JWT
-        private string GenerateJwtToken(User user)
-        {
-            var jwtSettings = _configuration.GetSection("JwtSettings");
-            var secretKey = jwtSettings["SecretKey"];
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
-            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()) // Уникальный ID токена
-            };
-
-            var token = new JwtSecurityToken(
-                issuer: jwtSettings["Issuer"],
-                audience: jwtSettings["Audience"],
-                claims: claims,
-                expires: DateTime.UtcNow.AddDays(1),
-                signingCredentials: credentials
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
-
         // Получить информацию о текущем пользователе
         [HttpGet("me")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [Authorize]
+        [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-        public async Task<ActionResult<object>> GetCurrentUser()
+        public async Task<ActionResult<UserDto>> GetCurrentUser()
         {
             // Получить ID пользователя из токена
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
@@ -211,13 +154,102 @@ namespace TrafficAnalysisAPI.Controllers
                 return NotFound(new { message = "Пользователь не найден" });
             }
 
-            return Ok(new
+            return Ok(new UserDto
             {
-                user.Id,
-                user.Username,
-                user.Role,
-                user.CreatedAt
+                Id = user.Id,
+                Username = user.Username,
+                Role = user.Role,
+                CreatedAt = user.CreatedAt
             });
+        }
+
+        // Получить список всех пользователей (только для админов)
+        [HttpGet("users")]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(typeof(IEnumerable<UserDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<ActionResult<IEnumerable<UserDto>>> GetAllUsers()
+        {
+            try
+            {
+                var users = await _authService.GetAllUsersAsync();
+
+                var userDtos = users.Select(u => new UserDto
+                {
+                    Id = u.Id,
+                    Username = u.Username,
+                    Role = u.Role,
+                    CreatedAt = u.CreatedAt
+                });
+
+                return Ok(userDtos);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting all users");
+                return StatusCode(500, new { message = "Ошибка при получении списка пользователей" });
+            }
+        }
+
+        // Удалить пользователя (только для админов)
+        [HttpDelete("users/{id}")]
+        [Authorize(Roles = "Admin")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        public async Task<IActionResult> DeleteUser(int id)
+        {
+            try
+            {
+                var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+
+                if (currentUserId == id)
+                {
+                    return BadRequest(new { message = "Нельзя удалить самого себя" });
+                }
+
+                var deleted = await _authService.DeleteUserAsync(id);
+
+                if (!deleted)
+                {
+                    return NotFound(new { message = "Пользователь не найден" });
+                }
+
+                _logger.LogInformation($"Admin {User.Identity?.Name} deleted user with ID {id}");
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting user {id}");
+                return StatusCode(500, new { message = "Ошибка при удалении пользователя" });
+            }
+        }
+
+        // Генерация JWT
+        private string GenerateJwtToken(User user)
+        {
+            var jwtSettings = _configuration.GetSection("JwtSettings");
+            var secretKey = jwtSettings["SecretKey"];
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Role, user.Role),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
+
+            var token = new JwtSecurityToken(
+                issuer: jwtSettings["Issuer"],
+                audience: jwtSettings["Audience"],
+                claims: claims,
+                expires: DateTime.UtcNow.AddDays(1),
+                signingCredentials: credentials
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }

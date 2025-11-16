@@ -28,6 +28,13 @@ namespace TrafficAnalysisAPI.Services.Implementations
             return await _context.Users.FindAsync(userId);
         }
 
+        public async Task<IEnumerable<User>> GetAllUsersAsync()
+        {
+            return await _context.Users
+                .OrderBy(u => u.Username)
+                .ToListAsync();
+        }
+
         public async Task<bool> UserExistsAsync(string username)
         {
             return await _context.Users
@@ -52,6 +59,19 @@ namespace TrafficAnalysisAPI.Services.Implementations
             _logger.LogInformation($"New user created: {newUser.Username} with role {newUser.Role}");
 
             return newUser;
+        }
+
+        public async Task<bool> DeleteUserAsync(int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                return false;
+
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation($"User deleted: {user.Username} (ID: {userId})");
+            return true;
         }
 
         public bool VerifyPassword(string password, string passwordHash)
