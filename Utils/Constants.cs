@@ -15,11 +15,14 @@
 
         public static readonly HashSet<string> StandardProtocols = new()
         {
-            "TCP",
-            "UDP",
+            "ARP",
+            "DNS",
             "ICMP",
             "HTTP",
-            "HTTPS"
+            "HTTPS",
+            "TCP",
+            "TLS",
+            "UDP"
         };
 
         public const int MaxPacketSize = 65535;

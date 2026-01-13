@@ -14,6 +14,7 @@ namespace TrafficAnalysisAPI.Data
         public DbSet<NetworkPacket> NetworkPackets { get; set; }
         public DbSet<TrafficAnalysis> TrafficAnalyses { get; set; }
         public DbSet<TrafficSession> TrafficSessions { get; set; }
+        public DbSet<SourceMetrics> SourceMetrics { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -179,6 +180,16 @@ namespace TrafficAnalysisAPI.Data
                     DetectedAt = new DateTime(2025, 10, 19, 12, 25, 0, DateTimeKind.Utc)
                 }
             );
+
+            // Индексы для SourceMetrics
+            modelBuilder.Entity<SourceMetrics>()
+                .HasIndex(m => m.SourceIP);
+
+            modelBuilder.Entity<SourceMetrics>()
+                .HasIndex(m => m.ClusterId);
+
+            modelBuilder.Entity<SourceMetrics>()
+                .HasIndex(m => m.IsDangerous);
 
 
         }

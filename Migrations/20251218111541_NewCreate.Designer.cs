@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TrafficAnalysisAPI.Data;
@@ -11,9 +12,11 @@ using TrafficAnalysisAPI.Data;
 namespace TrafficAnalysisAPI.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251218111541_NewCreate")]
+    partial class NewCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -164,11 +167,8 @@ namespace TrafficAnalysisAPI.Migrations
                         .HasColumnType("double precision");
 
                     b.Property<string>("Protocols")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<int?>("SessionId")
-                        .HasColumnType("integer");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("SourceIP")
                         .IsRequired()
@@ -186,8 +186,6 @@ namespace TrafficAnalysisAPI.Migrations
                     b.HasIndex("ClusterId");
 
                     b.HasIndex("IsDangerous");
-
-                    b.HasIndex("SessionId");
 
                     b.HasIndex("SourceIP");
 
@@ -365,15 +363,6 @@ namespace TrafficAnalysisAPI.Migrations
                         .WithMany("Packets")
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Session");
-                });
-
-            modelBuilder.Entity("TrafficAnalysisAPI.Models.SourceMetrics", b =>
-                {
-                    b.HasOne("TrafficAnalysisAPI.Models.TrafficSession", "Session")
-                        .WithMany()
-                        .HasForeignKey("SessionId");
 
                     b.Navigation("Session");
                 });

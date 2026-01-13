@@ -22,7 +22,7 @@ namespace TrafficAnalysisAPI.Models
 
         [Required]
         [StringLength(10)]
-        public string Protocol { get; set; } // TCP/UDP/
+        public string Protocol { get; set; }
 
         public int PacketSize { get; set; } // в байтах
 
