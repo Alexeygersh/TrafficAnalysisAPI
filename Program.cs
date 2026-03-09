@@ -36,6 +36,28 @@ try
     PythonEngine.Initialize();
     PythonEngine.BeginAllowThreads();
     Console.WriteLine("Python.NET initialized successfully");
+
+    // ========================================
+    //  НОВОЕ: ЗАГРУЗКА ML МОДЕЛИ ПРИ СТАРТЕ
+    // ========================================
+    using (Py.GIL())
+    {
+        // 1. Загрузка кластеризации
+        Console.WriteLine("Loading optimized clustering...");
+        dynamic clustering = Py.Import("optimized_clustering");
+        clustering.OptimizedClustering.load_or_create("models/clustering_model.pkl");
+        Console.WriteLine("Optimized clustering loaded");
+
+        // 2. Загрузка ML модели
+        Console.WriteLine("Loading ML model...");
+        dynamic ml = Py.Import("/PythonScripts/hybrid_ids");
+        ml.HybridIDS.load("MLModels/hybrid_ids_v1.pkl");
+        Console.WriteLine("ML model loaded");
+
+        Console.WriteLine("All Python models loaded successfully!");
+    }
+
+
 }
 catch (Exception ex)
 {
@@ -181,6 +203,36 @@ using (var scope = app.Services.CreateScope())
         throw;
     }
 }
+
+
+// === ПРОВЕРКА ДОСТУПНОСТИ МОДЕЛИ ===
+app.MapGet("/health/ml", (ILogger<Program> logger) =>
+{
+    using (Py.GIL())
+    {
+        try
+        {
+            dynamic py = Py.Import("PythonScripts/hybrid_ids");
+            dynamic model = py.HybridIDS.load("MLModels/hybrid_ids_v1.pkl");
+
+            return Results.Ok(new
+            {
+                status = "ok",
+                modelLoaded = true,
+                modelType = "HybridIDS"
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "ML health check failed");
+            return Results.Problem(
+                detail: ex.Message,
+                title: "ML Model Not Available"
+            );
+        }
+    }
+});
+
 
 // === MIDDLEWARE ===
 if (app.Environment.IsDevelopment())

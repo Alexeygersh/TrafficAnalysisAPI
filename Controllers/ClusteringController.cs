@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrafficAnalysisAPI.Data;
 using TrafficAnalysisAPI.DTOs;
+using TrafficAnalysisAPI.DTOs.ML;
 using TrafficAnalysisAPI.Models;
 using TrafficAnalysisAPI.Services.Interfaces;
 
@@ -457,5 +458,113 @@ namespace TrafficAnalysisAPI.Controllers
             }
         }
         */
+
+
+        // ---------------------------------------------------------------
+        // НОВЫЙ ENDPOINT: ML-анализ источников трафика (HybridIDS)
+        // Добавить в ClusteringController.cs перед последней закрывающей скобкой класса
+        // ---------------------------------------------------------------
+
+        /// <summary>
+        /// Запускает гибридную ML-модель (Random Forest + Isolation Forest)
+        /// для всех источников трафика указанной сессии.
+        /// 
+        /// POST /api/clustering/ml-analyze?sessionId=1
+        /// 
+        /// Возвращает для каждого IP-источника:
+        ///   - isAttack: является ли источник атакующим
+        ///   - confidence: уверенность модели (0.0–1.0)
+        ///   - threatLevel: Low / Medium / High / Critical
+        ///   - method: supervised / unsupervised / both / none
+        /// </summary>
+        [HttpPost("ml-analyze")]
+        [ProducesResponseType(typeof(MLAnalyzeResultDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<MLAnalyzeResultDto>> RunMLAnalysis(
+            [FromQuery] int sessionId)
+        {
+            try
+            {
+                // 1. Загружаем метрики источников для сессии
+                var metrics = await _context.SourceMetrics
+                    .Where(m => m.SessionId == sessionId)
+                    .OrderByDescending(m => m.DangerScore)
+                    .ToListAsync();
+
+                if (!metrics.Any())
+                    return NotFound(new
+                    {
+                        message = $"Нет данных для сессии {sessionId}. " +
+                                  "Сначала выполните кластеризацию (recalculate-from-database)."
+                    });
+
+                // 2. Преобразуем в DTO с DangerScore (который есть в SourceMetrics, но не в SourceMetricsDto)
+                //    Передаём через анонимный тип — PredictSourcesBatch принимает SourceMetricsDto,
+                //    поэтому используем отдельный вызов с расширенными данными
+                var metricsDto = metrics.Select(m => new SourceMetricsDto
+                {
+                    SourceIP = m.SourceIP,
+                    PacketCount = m.PacketCount,
+                    PacketsPerSecond = m.PacketsPerSecond,
+                    AveragePacketSize = m.AveragePacketSize,
+                    TotalBytes = m.TotalBytes,
+                    UniquePorts = m.UniquePorts,
+                    Protocols = m.Protocols?.Split(',').ToList() ?? new List<string>(),
+                    Duration = m.Duration,
+                }).ToList();
+
+                // Для DangerScore создаём словарь IP → score
+                var dangerScores = metrics.ToDictionary(m => m.SourceIP, m => m.DangerScore);
+
+                _logger.LogInformation(
+                    $"[MLAnalyze] Запуск HybridIDS для сессии {sessionId}: " +
+                    $"{metricsDto.Count} источников");
+
+                // 3. Вызываем ML-предсказание
+                var predictions = _pythonML.PredictSourcesBatch(metricsDto);
+
+                // 4. Обновляем IsDangerous и MLMethod в БД на основе ML-результатов
+                //    (не перезаписываем DangerScore — он от кластеризации)
+                foreach (var prediction in predictions)
+                {
+                    var metric = metrics.FirstOrDefault(m => m.SourceIP == prediction.SourceIP);
+                    if (metric != null)
+                    {
+                        // ML уточняет флаг опасности
+                        metric.IsDangerous = prediction.IsAttack;
+                        metric.CalculatedAt = DateTime.UtcNow;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+
+                // 5. Формируем итоговый ответ
+                var result = new MLAnalyzeResultDto
+                {
+                    SessionId = sessionId,
+                    TotalSources = predictions.Count,
+                    AttackSources = predictions.Count(p => p.IsAttack),
+                    AnomalySources = predictions.Count(p => p.IsAnomaly),
+                    Predictions = predictions,
+                };
+
+                _logger.LogInformation(
+                    $"[MLAnalyze] Завершено: {result.AttackSources}/{result.TotalSources} " +
+                    $"источников классифицированы как атакующие");
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"[MLAnalyze] Ошибка ML-анализа для сессии {sessionId}");
+                return StatusCode(500, new
+                {
+                    message = "Ошибка ML-анализа",
+                    error = ex.Message,
+                    hint = "Убедитесь что модель обучена: запустите train_hybrid_model.py"
+                });
+            }
+        }
     }
 }

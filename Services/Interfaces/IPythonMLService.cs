@@ -1,4 +1,5 @@
 ﻿using TrafficAnalysisAPI.DTOs;
+using TrafficAnalysisAPI.DTOs.ML;
 
 namespace TrafficAnalysisAPI.Services.Interfaces
 {
@@ -17,17 +18,25 @@ namespace TrafficAnalysisAPI.Services.Interfaces
             int nClusters = 3
         );
 
-        // Threat scoring
+        // Threat scoring (пакетный уровень)
         PacketThreatResultDto CalculatePacketThreatScore(object packetData);
+        Dictionary<int, PacketThreatResultDto> BatchScorePackets(List<object> packets);
 
-        // Массовый scoring
-        Dictionary<int, PacketThreatResultDto> BatchScorePackets(
-            List<object> packets
-        );
-
-
+        // Визуализации
         VisualizationResultDto VisualizeCluster(object clusterData);
         VisualizationResultDto CreateClusterHeatmap(object clusterData);
         VisualizationResultDto CreateDangerTimeline(object clusterData);
+
+        // ---------------------------------------------------------------
+        // Гибридная IDS (source-level анализ)
+        // ---------------------------------------------------------------
+
+        /// <summary>
+        /// ML-предсказание для списка источников трафика (source-level).
+        /// Использует HybridIDS: Random Forest + Isolation Forest.
+        /// </summary>
+        /// <param name="sources">Список метрик источников из SourceMetrics</param>
+        /// <returns>Список предсказаний — по одному на каждый IP-источник</returns>
+        List<SourceMLPredictionDto> PredictSourcesBatch(List<SourceMetricsDto> sources);
     }
 }
