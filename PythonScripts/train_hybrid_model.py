@@ -1,223 +1,181 @@
 """
-Скрипт обучения гибридной IDS-модели.
+Скрипт обучения HybridIDS на Flow-CSV формате CICIDS2017.
 
-Поскольку CICIDS2017 работает с flow-уровнем (15+ фич на TCP-поток),
-а наша система работает с source-уровнем (6 агрегированных фич по IP),
-мы генерируем синтетические обучающие данные на основе реалистичных
-профилей атак и нормального трафика.
+Положи файл(ы) в одну папку — метки берутся из колонки Label:
+  PythonScripts/data/cicids2017/
+    Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv   (BENIGN + DDoS)
+    Friday-WorkingHours-Afternoon-PortScan.csv          (BENIGN + PortScan)
+    Wednesday-workingHours.pcap_ISCX.csv               (BENIGN + DoS)
 
-Профили атак взяты из:
-  - CICIDS2017 статистики (средние значения по типам атак)
-  - RFC 4732 (DoS характеристики)
-  - Опыта сетевой безопасности (port scan, brute force паттерны)
+Не нужны отдельные папки normal/ и attack/ — всё в одной папке data/cicids2017/.
 """
 
+import os, sys, json
 import numpy as np
-import os
-import sys
+import pandas as pd
 
-# Добавляем путь к модулю hybrid_ids
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from hybrid_ids import HybridIDS
+from hybrid_ids import HybridIDS, FEATURE_NAMES
 
-RANDOM_STATE = 42
-rng = np.random.default_rng(RANDOM_STATE)
+DATA_DIR   = os.path.join(os.path.dirname(__file__), 'data', 'cicids2017')
+MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', 'hybrid_ids_v1.pkl')
 
-# Путь для сохранения модели
-MODEL_PATH = os.path.join(os.path.dirname(__file__), 'MLModels', 'hybrid_ids_v1.pkl')
+# Сколько строк читать из каждого файла (None = все)
+NROWS = 300_000
 
 
-# ===========================================================================
-# Генерация синтетических данных
-# ===========================================================================
-
-def generate_normal_traffic(n: int) -> np.ndarray:
+def load_flow_csv(filepath: str) -> pd.DataFrame:
     """
-    Нормальный трафик: редкие запросы, мало портов, умеренный размер пакетов.
-    Типичный паттерн: рабочая станция, сервер мониторинга SCADA.
+    Загружает flow-CSV CICIDS2017.
+    Каждая строка = один TCP-поток.
+    Маппим flow-признаки на наши 6 source-level признаков напрямую
+    (без агрегации по IP — flow уже агрегирован).
     """
-    return np.column_stack([
-        rng.uniform(0.1, 50, n),        # PacketsPerSecond: 0.1–50 pps
-        rng.uniform(200, 1400, n),       # AveragePacketSize: 200–1400 байт
-        rng.integers(1, 8, n),           # UniquePorts: 1–7 (мало портов)
-        rng.uniform(1e3, 5e6, n),        # TotalBytes: 1 KB – 5 MB
-        rng.integers(10, 1000, n),       # PacketCount: 10–1000
-        rng.uniform(0.0, 0.25, n),       # DangerScore: низкий
-    ]).astype(float)
+    print(f"  Загружаю {os.path.basename(filepath)}...", end=' ', flush=True)
+    df = pd.read_csv(filepath, low_memory=False, nrows=NROWS)
+    df.columns = df.columns.str.strip()
+
+    # Ищем нужные колонки (имена чуть отличаются в разных версиях датасета)
+    def find_col(*candidates):
+        for c in candidates:
+            match = next((col for col in df.columns if c.lower() in col.lower()), None)
+            if match:
+                return match
+        return None
+
+    col_pps   = find_col('Flow Packets/s')
+    col_size  = find_col('Packet Length Mean', 'Average Packet Size', 'Fwd Packet Length Mean')
+    col_port  = find_col('Destination Port', 'Dst Port')
+    col_bytes = find_col('Flow Bytes/s')
+    col_pkts  = find_col('Total Fwd Packets', 'Total Fwd Packet')
+    col_label = find_col('Label')
+
+    if not col_label:
+        raise ValueError("Колонка Label не найдена")
+
+    # Числовые преобразования
+    for col in [col_pps, col_size, col_port, col_bytes, col_pkts]:
+        if col:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    df.replace([np.inf, -np.inf], np.nan, inplace=True)
+    df['is_attack'] = df[col_label].astype(str).str.strip().apply(
+        lambda x: 0 if x.upper() == 'BENIGN' else 1
+    )
+
+    result = pd.DataFrame({
+        'PacketsPerSecond':  df[col_pps].abs()   if col_pps   else 0.0,
+        'AveragePacketSize': df[col_size]         if col_size  else 0.0,
+        'UniquePorts':       df[col_port]         if col_port  else 0.0,
+        'TotalBytes':        df[col_bytes].abs()  if col_bytes else 0.0,
+        'PacketCount':       df[col_pkts]         if col_pkts  else 0.0,
+        'DangerScore':       0.0,
+        'label':             df['is_attack'],
+    }).fillna(0.0)
+
+    n0 = (result['label'] == 0).sum()
+    n1 = (result['label'] == 1).sum()
+    print(f"{len(result):,} строк  (BENIGN={n0:,}, attack={n1:,})")
+    return result
 
 
-def generate_dos_attack(n: int) -> np.ndarray:
-    """
-    DoS/DDoS: очень высокая скорость пакетов, много байт, мало уникальных портов.
-    Источник: CICIDS2017 DoS Hulk, DoS Slowloris профили.
-    """
-    return np.column_stack([
-        rng.uniform(500, 5000, n),       # PacketsPerSecond: 500–5000 pps (характерно для DoS)
-        rng.uniform(50, 600, n),         # AveragePacketSize: мелкие пакеты (SYN flood)
-        rng.integers(1, 4, n),           # UniquePorts: 1–3 (один целевой порт)
-        rng.uniform(1e7, 1e9, n),        # TotalBytes: 10 MB – 1 GB
-        rng.integers(5000, 500000, n),   # PacketCount: очень много
-        rng.uniform(0.6, 1.0, n),        # DangerScore: высокий
-    ]).astype(float)
-
-
-def generate_port_scan(n: int) -> np.ndarray:
-    """
-    Сканирование портов: умеренная скорость, ОЧЕНЬ много уникальных портов,
-    маленькие пакеты (TCP SYN).
-    Источник: Nmap/Masscan профили, CICIDS2017 PortScan.
-    """
-    return np.column_stack([
-        rng.uniform(10, 300, n),         # PacketsPerSecond: умеренная (10–300)
-        rng.uniform(40, 80, n),          # AveragePacketSize: маленькие (TCP SYN = ~60 байт)
-        rng.integers(50, 65535, n),      # UniquePorts: КЛЮЧЕВОЙ признак — сотни/тысячи портов
-        rng.uniform(1e4, 5e6, n),        # TotalBytes: умеренно
-        rng.integers(100, 50000, n),     # PacketCount: умеренно
-        rng.uniform(0.3, 0.8, n),        # DangerScore: средний-высокий
-    ]).astype(float)
-
-
-def generate_brute_force(n: int) -> np.ndarray:
-    """
-    Brute force (SSH/RDP): постоянная средняя скорость, 1–2 порта,
-    характерный размер пакетов аутентификации.
-    Источник: CICIDS2017 FTP-Patator, SSH-Patator профили.
-    """
-    return np.column_stack([
-        rng.uniform(5, 100, n),          # PacketsPerSecond: умеренная
-        rng.uniform(100, 400, n),        # AveragePacketSize: auth-пакеты
-        rng.integers(1, 3, n),           # UniquePorts: 1–2 (22, 3389, 21)
-        rng.uniform(5e4, 2e7, n),        # TotalBytes: умеренно
-        rng.integers(500, 20000, n),     # PacketCount: много попыток
-        rng.uniform(0.4, 0.85, n),       # DangerScore: средний-высокий
-    ]).astype(float)
-
-
-def generate_data_exfiltration(n: int) -> np.ndarray:
-    """
-    Утечка данных: большой объём исходящих данных, нетипичные порты,
-    нечастые но объёмные передачи.
-    """
-    return np.column_stack([
-        rng.uniform(1, 30, n),           # PacketsPerSecond: невысокая (скрытность)
-        rng.uniform(1000, 9000, n),      # AveragePacketSize: большие пакеты (данные)
-        rng.integers(1, 5, n),           # UniquePorts: мало (1–2 C2 сервера)
-        rng.uniform(1e7, 1e10, n),       # TotalBytes: ОЧЕНЬ много (гигабайты)
-        rng.integers(1000, 100000, n),   # PacketCount: умеренно
-        rng.uniform(0.45, 0.9, n),       # DangerScore: средний-высокий
-    ]).astype(float)
-
-
-# ===========================================================================
-# Основная функция
-# ===========================================================================
-
-def generate_dataset(
-    n_normal: int = 2000,
-    n_dos: int = 500,
-    n_scan: int = 500,
-    n_brute: int = 400,
-    n_exfil: int = 300,
-):
-    """
-    Собирает полный датасет из всех профилей трафика.
-    Возвращает (X, y) где y: 0=нормальный, 1=атака.
-    """
-    print("Генерация синтетических обучающих данных...")
-    print(f"  Нормальный трафик: {n_normal} образцов")
-    print(f"  DoS-атаки:         {n_dos} образцов")
-    print(f"  Сканирование:      {n_scan} образцов")
-    print(f"  Brute force:       {n_brute} образцов")
-    print(f"  Утечка данных:     {n_exfil} образцов")
-
-    X_normal    = generate_normal_traffic(n_normal)
-    X_dos       = generate_dos_attack(n_dos)
-    X_scan      = generate_port_scan(n_scan)
-    X_brute     = generate_brute_force(n_brute)
-    X_exfil     = generate_data_exfiltration(n_exfil)
-
-    X = np.vstack([X_normal, X_dos, X_scan, X_brute, X_exfil])
-    y = np.hstack([
-        np.zeros(n_normal, dtype=int),
-        np.ones(n_dos,    dtype=int),
-        np.ones(n_scan,   dtype=int),
-        np.ones(n_brute,  dtype=int),
-        np.ones(n_exfil,  dtype=int),
-    ])
-
-    # Перемешиваем
-    idx = rng.permutation(len(X))
+def balance_dataset(X, y, rng):
+    n0, n1 = int(np.sum(y==0)), int(np.sum(y==1))
+    if n0 == 0 or n1 == 0:
+        print("  ВНИМАНИЕ: один класс пустой")
+        return X, y
+    n_min = min(n0, n1)
+    print(f"Балансировка: BENIGN {n0}→{n_min}, attack {n1}→{n_min}")
+    idx = rng.permutation(np.concatenate([
+        rng.choice(np.where(y==0)[0], n_min, replace=False),
+        rng.choice(np.where(y==1)[0], n_min, replace=False),
+    ]))
     return X[idx], y[idx]
 
 
-def evaluate_model(model: HybridIDS, X_test: np.ndarray, y_test: np.ndarray):
-    """Простая оценка качества модели на тестовой выборке."""
-    results_json = model.predict_batch(
-        __import__('json').dumps([
-            {
-                'PacketsPerSecond':  float(X_test[i, 0]),
-                'AveragePacketSize': float(X_test[i, 1]),
-                'UniquePorts':       float(X_test[i, 2]),
-                'TotalBytes':        float(X_test[i, 3]),
-                'PacketCount':       float(X_test[i, 4]),
-                'DangerScore':       float(X_test[i, 5]),
-                'SourceIP':          f'test_{i}',
-            }
-            for i in range(len(X_test))
-        ])
-    )
-    import json
-    results = json.loads(results_json)
+def evaluate(model, X_test, y_test):
+    # Напрямую через sklearn — без predict_batch чтобы избежать
+    # зависания joblib ThreadPool на Python 3.14
+    X_scaled = model.scaler.transform(X_test)
+    y_pred   = model.supervised.predict(X_scaled)
 
-    y_pred = np.array([1 if r['isAttack'] else 0 for r in results])
+    tp = int(np.sum((y_pred==1) & (y_test==1)))
+    tn = int(np.sum((y_pred==0) & (y_test==0)))
+    fp = int(np.sum((y_pred==1) & (y_test==0)))
+    fn = int(np.sum((y_pred==0) & (y_test==1)))
 
-    tp = int(np.sum((y_pred == 1) & (y_test == 1)))
-    tn = int(np.sum((y_pred == 0) & (y_test == 0)))
-    fp = int(np.sum((y_pred == 1) & (y_test == 0)))
-    fn = int(np.sum((y_pred == 0) & (y_test == 1)))
+    acc  = (tp+tn)/len(y_test)
+    prec = tp/(tp+fp) if (tp+fp)>0 else 0.0
+    rec  = tp/(tp+fn) if (tp+fn)>0 else 0.0
+    f1   = 2*prec*rec/(prec+rec) if (prec+rec)>0 else 0.0
 
-    accuracy  = (tp + tn) / len(y_test)
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall    = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    f1        = (2 * precision * recall / (precision + recall)
-                 if (precision + recall) > 0 else 0.0)
-
-    print("\nРезультаты на тестовой выборке:")
-    print(f"  Accuracy:  {accuracy:.3f}")
-    print(f"  Precision: {precision:.3f}")
-    print(f"  Recall:    {recall:.3f}")
-    print(f"  F1-score:  {f1:.3f}")
+    print("\n" + "="*50)
+    print("  Метрики качества")
+    print("="*50)
+    print(f"  Accuracy:  {acc:.4f}")
+    print(f"  Precision: {prec:.4f}")
+    print(f"  Recall:    {rec:.4f}")
+    print(f"  F1-score:  {f1:.4f}")
     print(f"  TP={tp}, TN={tn}, FP={fp}, FN={fn}")
+    print("="*50)
 
 
 def main():
-    print("=" * 60)
-    print("  Обучение HybridIDS модели")
-    print("=" * 60)
+    rng = np.random.default_rng(42)
 
-    # 1. Генерация данных
-    X, y = generate_dataset()
-    total = len(X)
-    split = int(total * 0.8)
+    print("="*60)
+    print("  Обучение HybridIDS на CICIDS2017 Flow-CSV")
+    print("="*60)
+    print(f"  Папка данных: {DATA_DIR}")
+    print(f"  Строк из каждого файла: {NROWS:,}")
 
-    X_train, X_test = X[:split], X[split:]
-    y_train, y_test = y[:split], y[split:]
+    csv_files = [f for f in os.listdir(DATA_DIR)
+                 if f.endswith('.csv') and os.path.isfile(os.path.join(DATA_DIR, f))]
 
-    print(f"\nРазбивка: train={len(X_train)}, test={len(X_test)}")
+    if not csv_files:
+        print(f"\nНет CSV в {DATA_DIR}")
+        print("Положите flow-CSV файлы CICIDS2017 прямо в эту папку.")
+        return
 
-    # 2. Обучение
-    print()
+    print(f"\n[1/4] Загрузка {len(csv_files)} файлов...")
+    frames = []
+    for fname in sorted(csv_files):
+        try:
+            df = load_flow_csv(os.path.join(DATA_DIR, fname))
+            frames.append(df)
+        except Exception as e:
+            print(f"  ПРОПУЩЕН {fname}: {e}")
+
+    if not frames:
+        print("Не удалось загрузить ни одного файла.")
+        return
+
+    df_all = pd.concat(frames, ignore_index=True)
+
+    print(f"\n[2/4] Итого: {len(df_all):,} записей")
+    print(f"  BENIGN:  {(df_all['label']==0).sum():,}")
+    print(f"  Атак:    {(df_all['label']==1).sum():,}")
+
+    print("\n  Статистика признаков:")
+    for feat in FEATURE_NAMES[:4]:
+        n = df_all[df_all['label']==0][feat].mean()
+        a = df_all[df_all['label']==1][feat].mean()
+        r = a/n if n > 0 else float('inf')
+        print(f"    {feat:20s}: BENIGN={n:10.2f}, attack={a:10.2f}  ratio={r:.1f}x")
+
+    print(f"\n[3/4] Обучение...")
+    X = df_all[FEATURE_NAMES].values.astype(float)
+    y = df_all['label'].values.astype(int)
+    X, y = balance_dataset(X, y, rng)
+
+    split = int(len(X) * 0.8)
     model = HybridIDS()
-    model.train(X_train, y_train)
+    model.train(X[:split], y[:split])
 
-    # 3. Оценка
-    evaluate_model(model, X_test, y_test)
-
-    # 4. Сохранение
-    print(f"\nСохранение модели в {MODEL_PATH}...")
+    print(f"\n[4/4] Оценка и сохранение...")
+    evaluate(model, X[split:], y[split:])
     model.save(MODEL_PATH)
-    print("\nГотово! Модель обучена и сохранена.")
-    print(f"Путь: {MODEL_PATH}")
+    print(f"\nГотово! {MODEL_PATH}")
 
 
 if __name__ == '__main__':
