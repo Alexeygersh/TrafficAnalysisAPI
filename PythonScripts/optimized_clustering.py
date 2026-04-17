@@ -17,7 +17,7 @@ class OptimizedClustering:
     _feature_indices = None  # Индексы важных фичей
     
     @classmethod
-    def load_or_create(cls, model_path='MLModels/clustering_model.pkl'):
+    def load_or_create(cls, model_path='models/clustering_model.pkl'):
         """Загрузка или создание модели"""
         if not os.path.exists(model_path):
             print("Clustering model not found, creating new one...")
@@ -48,7 +48,7 @@ class OptimizedClustering:
         return cls
     
     @classmethod
-    def save(cls, model_path='MLModels/clustering_model.pkl'):
+    def save(cls, model_path='models/clustering_model.pkl'):
         """Сохранение модели"""
         model_data = {
             'scaler': cls._scaler,

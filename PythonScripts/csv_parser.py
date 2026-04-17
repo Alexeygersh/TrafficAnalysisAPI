@@ -39,6 +39,57 @@ def parse_packet_row(row: Dict[str, Any]) -> Dict[str, Any]:
         'info': row.get('Info', '') or ''
     }
 
+def calculate_session_metrics(json_data):
+    packets = json.loads(json_data)
+
+    if not packets:
+        return json.dumps([])
+
+    sources = {}
+
+    for packet in packets:
+        ip = packet.get('sourceIP', '')
+        if not ip:
+            continue
+
+        if ip not in sources:
+            sources[ip] = {
+                'sourceIP': ip,
+                'packetCount': 0,
+                'totalLength': 0,
+                'firstTime': packet.get('time', 0),
+                'lastTime': packet.get('time', 0),
+                'protocols': set(),
+                'ports': []
+            }
+
+        sources[ip]['packetCount'] += 1
+        sources[ip]['totalLength'] += packet.get('length', 0)
+        t = packet.get('time', 0)
+        if t > sources[ip]['lastTime']:
+            sources[ip]['lastTime'] = t
+        sources[ip]['protocols'].add(packet.get('protocol', ''))
+        sources[ip]['ports'].append(packet.get('port', 0))
+
+    result = []
+    for ip, data in sources.items():
+        duration = data['lastTime'] - data['firstTime']
+        if duration < 0.001:
+            duration = 0.001
+
+        result.append({
+            'sourceIP': ip,
+            'packetCount': data['packetCount'],
+            'packetsPerSecond': data['packetCount'] / duration,
+            'averagePacketSize': data['totalLength'] / data['packetCount'],
+            'totalBytes': data['totalLength'],
+            'duration': duration,
+            'protocols': list(data['protocols']),
+            'uniquePorts': len(set(data['ports']))
+        })
+
+    return json.dumps(result)
+
 def extract_port(info_string):
     #- "60662 > 443 [ACK]" -> 443 (destination port)
     #- "443 > 60662 [ACK]" -> 60662 (destination port)
@@ -90,6 +141,7 @@ def parse_packet_row(row):
     }
     
     return packet
+
 
 
 def calculate_session_metrics(json_data):
