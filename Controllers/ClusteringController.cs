@@ -242,7 +242,7 @@ namespace TrafficAnalysisAPI.Controllers
             }
         }
 
-        // Получить список сессий для фильтра
+        // Получить список сессий для фильтра (с подсчётом packets И flows)
         [HttpGet("sessions")]
         public async Task<ActionResult<List<SessionFilterDto>>> GetSessions()
         {
@@ -251,7 +251,8 @@ namespace TrafficAnalysisAPI.Controllers
                 {
                     Id = s.Id,
                     SessionName = s.SessionName,
-                    PacketCount = s.Packets != null ? s.Packets.Count : 0
+                    PacketCount = s.Packets.Count(p => p.SessionId == s.Id),
+                    FlowCount = _context.FlowMetrics.Count(f => f.SessionId == s.Id),
                 })
                 .OrderByDescending(s => s.Id)
                 .ToListAsync();
@@ -259,12 +260,13 @@ namespace TrafficAnalysisAPI.Controllers
             return Ok(sessions);
         }
 
-        // DTO для сессий
+        // DTO для сессий (расширено FlowCount)
         public class SessionFilterDto
         {
             public int Id { get; set; }
-            public string SessionName { get; set; }
+            public string SessionName { get; set; } = "";
             public int PacketCount { get; set; }
+            public int FlowCount { get; set; }
         }
 
         // Информация о кластерах

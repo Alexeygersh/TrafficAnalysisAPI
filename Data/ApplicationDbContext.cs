@@ -15,6 +15,7 @@ namespace TrafficAnalysisAPI.Data
         public DbSet<TrafficAnalysis> TrafficAnalyses { get; set; }
         public DbSet<TrafficSession> TrafficSessions { get; set; }
         public DbSet<SourceMetrics> SourceMetrics { get; set; }
+        public DbSet<FlowMetrics> FlowMetrics { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -50,6 +51,12 @@ namespace TrafficAnalysisAPI.Data
                 .HasIndex(u => u.Username)
                 .IsUnique();
 
+            modelBuilder.Entity<FlowMetrics>(entity =>
+            {
+                entity.HasIndex(f => f.SessionId);
+                entity.HasIndex(f => new { f.SourceIP, f.DestinationIP });
+                entity.HasIndex(f => f.Protocol);
+            });
 
             modelBuilder.Entity<User>().HasData(
             new User

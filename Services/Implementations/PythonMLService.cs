@@ -3,6 +3,7 @@ using System.Text.Json;
 using TrafficAnalysisAPI.DTOs;
 using TrafficAnalysisAPI.DTOs.ML;
 using TrafficAnalysisAPI.Services.Interfaces;
+using TrafficAnalysisAPI.Services.Implementations;
 
 namespace TrafficAnalysisAPI.Services.Implementations
 {
@@ -11,6 +12,8 @@ namespace TrafficAnalysisAPI.Services.Implementations
         private readonly ILogger<PythonMLService> _logger;
         private readonly string _scriptsPath;
         private readonly string _modelPath;
+        private readonly string _modelV2Path;
+        private readonly string _catBoostModelPath;
 
         public PythonMLService(
             ILogger<PythonMLService> logger,
@@ -24,6 +27,14 @@ namespace TrafficAnalysisAPI.Services.Implementations
             // Пример: "PythonScripts:ModelPath": "PythonScripts/models/hybrid_ids_v1.pkl"
             _modelPath = configuration["PythonScripts:ModelPath"] ??
                 Path.Combine(_scriptsPath, "models", "hybrid_ids_v1.pkl");
+
+            // v2 модель обученная на CICIDS
+            _modelV2Path = configuration["PythonScripts:ModelV2Path"] ??
+                Path.Combine(_scriptsPath, "models", "hybrid_ids_v2.pkl");
+
+            // путь к CatBoost модели
+            _catBoostModelPath = configuration["PythonScripts:CatBoostModelPath"] ??
+                Path.Combine(_scriptsPath, "models", "catboost_ids_v2.pkl");
         }
 
         public List<ParsedPacketDto> ParseWiresharkCsv(string csvContent)
@@ -84,6 +95,50 @@ namespace TrafficAnalysisAPI.Services.Implementations
                 throw new Exception($"Failed to calculate metrics: {ex.Message}");
             }
         }
+
+       
+        public List<FlowFeaturesDto> BuildFlowsFromPackets(List<RawPacket> packets)
+        {
+            if (packets == null || packets.Count == 0)
+                return new List<FlowFeaturesDto>();
+
+            try
+            {
+                using (Py.GIL())
+                {
+                    dynamic sys = Py.Import("sys");
+                    sys.path.append(_scriptsPath);
+
+                    // Важно: если модуль уже был импортирован раньше,
+                    // Python кэширует его. При изменении flow_features.py
+                    // нужен перезапуск backend, либо использовать importlib.reload.
+                    dynamic flowModule = Py.Import("flow_features");
+
+                    string packetsJson = JsonSerializer.Serialize(packets);
+                    _logger.LogInformation(
+                        $"[FlowFeatures] Sending {packets.Count} packets to Python");
+
+                    dynamic result = flowModule.build_flows_from_packets(packetsJson);
+                    string jsonResult = result?.ToString() ?? "[]";
+
+                    var flows = JsonSerializer.Deserialize<List<FlowFeaturesDto>>(
+                        jsonResult,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    ) ?? new List<FlowFeaturesDto>();
+
+                    _logger.LogInformation(
+                        $"[FlowFeatures] Built {flows.Count} flows from {packets.Count} packets");
+
+                    return flows;
+                }
+            }
+            catch (PythonException ex)
+            {
+                _logger.LogError(ex, "[FlowFeatures] Python error in BuildFlowsFromPackets");
+                throw new Exception($"Failed to build flows: {ex.Message}");
+            }
+        }
+        
 
         public List<SourceClusterResultDto> ClusterSources(
             List<SourceMetricsDto> sources,
@@ -340,6 +395,80 @@ namespace TrafficAnalysisAPI.Services.Implementations
                 throw new Exception($"HybridIDS prediction failed: {ex.Message}");
             }
         }
+
+
+        public List<FlowMLPredictionDto> PredictFlowsBatch(
+            List<TrafficAnalysisAPI.Models.FlowMetrics> flows,
+            string modelType = "rf")
+        {
+            if (flows == null || flows.Count == 0)
+                return new List<FlowMLPredictionDto>();
+
+            // Определяем какой модуль и файл использовать
+            string pyModuleName, pyClassName, pklPath;
+            if (modelType?.ToLower() == "catboost")
+            {
+                pyModuleName = "catboost_ids";
+                pyClassName = "CatBoostIDS";
+                pklPath = _catBoostModelPath;
+            }
+            else
+            {
+                pyModuleName = "hybrid_ids";
+                pyClassName = "HybridIDS";
+                pklPath = _modelV2Path;
+            }
+
+            try
+            {
+                using (Py.GIL())
+                {
+                    dynamic sys = Py.Import("sys");
+                    sys.path.append(_scriptsPath);
+
+                    dynamic module = Py.Import(pyModuleName);
+                    dynamic modelClass = module.GetAttr(pyClassName);
+                    dynamic model = modelClass.load(pklPath);
+
+                    var jsonOptions = new JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = null,
+                        ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles,
+                    };
+                    string flowsJson = JsonSerializer.Serialize(flows, jsonOptions);
+
+                    _logger.LogInformation(
+                        $"[FlowML-{modelType}] Отправка {flows.Count} flows");
+
+                    dynamic resultPy = model.predict_batch(flowsJson);
+                    string resultJson = resultPy?.ToString() ?? "[]";
+
+                    var rawList = JsonSerializer.Deserialize<List<FlowMLPredictionDto>>(
+                        resultJson,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    ) ?? new List<FlowMLPredictionDto>();
+
+                    // Заполняем FlowId по порядку
+                    for (int i = 0; i < rawList.Count && i < flows.Count; i++)
+                    {
+                        rawList[i].FlowId = flows[i].Id;
+                    }
+
+                    _logger.LogInformation(
+                        $"[FlowML-{modelType}] Получено {rawList.Count} предсказаний");
+                    return rawList;
+                }
+            }
+            catch (PythonException ex)
+            {
+                _logger.LogError(ex, $"[FlowML-{modelType}] Python error");
+                throw new Exception(
+                    $"ML prediction failed ({modelType}): {ex.Message}. " +
+                    "Проверьте что соответствующая модель обучена.");
+            }
+        }
+
+
     }
 }
 

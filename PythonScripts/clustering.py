@@ -12,8 +12,168 @@ from io import BytesIO
 import seaborn as sns
 
 
+
+def _get_field(item, *keys, default=0.0, cast=float):
+    """
+    Читает поле из dict, пробуя несколько вариантов имён.
+    Нужно потому что C# может прислать и camelCase, и PascalCase.
+ 
+    Пример:
+        _get_field(item, 'PacketsPerSecond', 'packetsPerSecond', default=0.0)
+    """
+    for k in keys:
+        if k in item and item[k] is not None:
+            try:
+                return cast(item[k])
+            except (TypeError, ValueError):
+                continue
+    return default
+
 def visualize_clusters(json_data):
-    """Создает 2D scatter plot кластеров с использованием PCA"""
+    """Создает 2D scatter plot кластеров с использованием PCA."""
+    data = json.loads(json_data)
+ 
+    print(f"--Visualizing {len(data)} sources")
+ 
+    if len(data) < 2:
+        return json.dumps({'error': 'Not enough data for visualization (need >= 2 sources)'})
+ 
+    # ИСПРАВЛЕНО: читаем поля и в PascalCase, и в camelCase
+    features = np.array([[
+        _get_field(item, 'PacketsPerSecond', 'packetsPerSecond', default=0.0, cast=float),
+        _get_field(item, 'PacketCount',      'packetCount',      default=0,   cast=int),
+        _get_field(item, 'AveragePacketSize','averagePacketSize',default=0.0, cast=float),
+        _get_field(item, 'UniquePorts',      'uniquePorts',      default=0,   cast=int),
+    ] for item in data])
+ 
+    # Диагностика — это очень поможет при отладке
+    print(f"--Features shape: {features.shape}")
+    print(f"--Features min/max/mean per column:")
+    for i, name in enumerate(['PPS', 'PktCount', 'AvgSize', 'UniquePorts']):
+        col = features[:, i]
+        print(f"   {name}: min={col.min():.2f}, max={col.max():.2f}, mean={col.mean():.2f}")
+ 
+    # ПРОВЕРКА: если все фичи — нули, сообщаем явно
+    if np.all(features == 0):
+        return json.dumps({
+            'error': 'All features are zero. Check that SourceMetrics are populated correctly.'
+        })
+ 
+    # ПРОВЕРКА: если дисперсия по всем признакам ноль (все точки одинаковые),
+    # PCA вернёт мусор. Сообщаем явно.
+    if np.all(np.std(features, axis=0) == 0):
+        return json.dumps({
+            'error': 'All sources have identical features — nothing to cluster visually.'
+        })
+ 
+    cluster_ids = np.array([_get_field(item, 'ClusterId', 'clusterId', default=1, cast=int)
+                            for item in data])
+    is_dangerous = np.array([_get_field(item, 'IsDangerous', 'isDangerous',
+                                        default=False, cast=bool)
+                             for item in data])
+    danger_scores = np.array([_get_field(item, 'DangerScore', 'dangerScore',
+                                         default=0.0, cast=float)
+                              for item in data])
+ 
+    # Нормализация и PCA
+    scaler = StandardScaler()
+    features_scaled = scaler.fit_transform(features)
+ 
+    pca = PCA(n_components=2)
+    features_2d = pca.fit_transform(features_scaled)
+ 
+    print(f"--PCA explained variance: {pca.explained_variance_ratio_}")
+ 
+    # Создаем график
+    plt.figure(figsize=(14, 10))
+ 
+    unique_clusters = np.unique(cluster_ids)
+    n_clusters = len(unique_clusters)
+    colors = plt.cm.tab10(np.linspace(0, 1, max(10, n_clusters)))
+ 
+    for idx, cluster_id in enumerate(unique_clusters):
+        mask = cluster_ids == cluster_id
+        cluster_color = colors[idx % len(colors)]
+ 
+        cluster_is_dangerous = bool(is_dangerous[mask][0]) if np.any(mask) else False
+ 
+        point_size = 300 if cluster_is_dangerous else 150
+        edge_width = 3 if cluster_is_dangerous else 1
+        edge_color = 'red' if cluster_is_dangerous else 'black'
+ 
+        cluster_label = f'Cluster {cluster_id}'
+        if cluster_is_dangerous:
+            cluster_label += ' [DANGER]'
+ 
+        plt.scatter(
+            features_2d[mask, 0],
+            features_2d[mask, 1],
+            c=[cluster_color] * int(np.sum(mask)),
+            s=point_size,
+            alpha=0.7,
+            edgecolors=edge_color,
+            linewidths=edge_width,
+            label=cluster_label
+        )
+ 
+        # Подписываем опасные точки
+        for i, is_danger_point in enumerate(is_dangerous[mask]):
+            if is_danger_point:
+                point_idx = np.where(mask)[0][i]
+                # ИСПРАВЛЕНО: sourceIP тоже может быть в обоих case-ах
+                ip_address = _get_field(data[point_idx], 'SourceIP', 'sourceIP',
+                                        default='?', cast=str)
+                danger_score_text = f"{danger_scores[point_idx]:.2f}"
+                annotation_text = f"{ip_address}\nScore: {danger_score_text}"
+ 
+                plt.annotate(
+                    annotation_text,
+                    (features_2d[point_idx, 0], features_2d[point_idx, 1]),
+                    fontsize=9,
+                    bbox=dict(boxstyle='round,pad=0.4', facecolor='yellow', alpha=0.7),
+                    ha='center'
+                )
+ 
+    variance_1 = float(pca.explained_variance_ratio_[0]) * 100
+    variance_2 = float(pca.explained_variance_ratio_[1]) * 100
+ 
+    plt.xlabel(f'PC1 ({variance_1:.1f}% variance)', fontsize=14, fontweight='bold')
+    plt.ylabel(f'PC2 ({variance_2:.1f}% variance)', fontsize=14, fontweight='bold')
+    plt.title(f'Source Clustering Visualization ({n_clusters} clusters)',
+              fontsize=16, fontweight='bold')
+    plt.legend(fontsize=11, loc='best', framealpha=0.9)
+    plt.grid(True, alpha=0.3, linestyle='--')
+ 
+    buffer = BytesIO()
+    plt.savefig(buffer, format='png', dpi=150, bbox_inches='tight')
+    buffer.seek(0)
+    image_base64 = base64.b64encode(buffer.read()).decode()
+    plt.close()
+ 
+    print(f"--Visualization created successfully with {n_clusters} clusters")
+ 
+    # Обработка NaN (если все точки одинаковые, PCA даёт NaN)
+    variance_ratio_1 = float(pca.explained_variance_ratio_[0])
+    variance_ratio_2 = float(pca.explained_variance_ratio_[1])
+ 
+    if np.isnan(variance_ratio_1):
+        variance_ratio_1 = 0.0
+    if np.isnan(variance_ratio_2):
+        variance_ratio_2 = 0.0
+ 
+    total_variance = variance_ratio_1 + variance_ratio_2
+    if np.isnan(total_variance):
+        total_variance = 0.0
+ 
+    return json.dumps({
+        'image': f'data:image/png;base64,{image_base64}',
+        'explainedVariance': [variance_ratio_1, variance_ratio_2],
+        'totalVarianceExplained': total_variance
+    })
+
+"""
+def visualize_clusters(json_data):
+    # Создает 2D scatter plot кластеров с использованием PCA
     data = json.loads(json_data)
     
     print(f"--Visualizing {len(data)} sources")
@@ -133,7 +293,7 @@ def visualize_clusters(json_data):
         'explainedVariance': [variance_ratio_1, variance_ratio_2],
         'totalVarianceExplained': total_variance
     })
-
+"""
 
 def cluster_sources(json_data, method='kmeans', n_clusters=3):
     data = json.loads(json_data)
@@ -151,6 +311,7 @@ def cluster_sources(json_data, method='kmeans', n_clusters=3):
             'clusterName': 'Cluster 1'
         } for item in data])
     
+    """
     features = np.array([
         [
             float(item.get('PacketsPerSecond', 0.0)),
@@ -160,6 +321,14 @@ def cluster_sources(json_data, method='kmeans', n_clusters=3):
         ] 
         for item in data
     ])
+    """
+
+    features = np.array([[
+        _get_field(item, 'PacketsPerSecond', 'packetsPerSecond', default=0.0, cast=float),
+        _get_field(item, 'PacketCount',      'packetCount',      default=0,   cast=int),
+        _get_field(item, 'AveragePacketSize','averagePacketSize',default=0.0, cast=float),
+        _get_field(item, 'UniquePorts',      'uniquePorts',      default=0,   cast=int),
+    ] for item in data])
     
     print(f"--Features shape: {features.shape}")
     print(f"--Sample features (first 3):\n{features[:3]}")
@@ -243,9 +412,15 @@ def calculate_cluster_danger(data, cluster_ids):
             }
         
         item = data[i]
-        clusters[cluster_id]['speeds'].append(float(item.get('PacketsPerSecond', 0.0)))
-        clusters[cluster_id]['packet_counts'].append(int(item.get('PacketCount', 0)))
-        clusters[cluster_id]['port_diversity'].append(int(item.get('UniquePorts', 0)))
+        #clusters[cluster_id]['speeds'].append(float(item.get('PacketsPerSecond', 0.0)))
+        #clusters[cluster_id]['packet_counts'].append(int(item.get('PacketCount', 0)))
+        #clusters[cluster_id]['port_diversity'].append(int(item.get('UniquePorts', 0)))
+        clusters[cluster_id]['speeds'].append(
+            _get_field(item, 'PacketsPerSecond', 'packetsPerSecond', default=0.0, cast=float))
+        clusters[cluster_id]['packet_counts'].append(
+            _get_field(item, 'PacketCount', 'packetCount', default=0, cast=int))
+        clusters[cluster_id]['port_diversity'].append(
+            _get_field(item, 'UniquePorts', 'uniquePorts', default=0, cast=int))
     
     cluster_stats = {}
     

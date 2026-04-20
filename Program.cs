@@ -81,6 +81,7 @@ builder.Services.AddScoped<IAnalysisService, AnalysisService>();
 builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IPythonMLService, PythonMLService>();
+builder.Services.AddScoped<IPcapParserService, PcapParserService>();
 
 // === KESTREL ===
 builder.WebHost.ConfigureKestrel(options =>
@@ -157,28 +158,13 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "bearer",
         BearerFormat = "JWT"
     });
-    /*
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    
+    c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
     {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
+        [new OpenApiSecuritySchemeReference("bearer", document)] = []
     });
 
 
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        [new OpenApiSecuritySchemeReference("Bearer", document)] = Array.Empty<string>()
-    });
-    */
 
 });
 

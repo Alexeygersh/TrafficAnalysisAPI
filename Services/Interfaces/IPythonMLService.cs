@@ -38,5 +38,24 @@ namespace TrafficAnalysisAPI.Services.Interfaces
         /// <param name="sources">Список метрик источников из SourceMetrics</param>
         /// <returns>Список предсказаний — по одному на каждый IP-источник</returns>
         List<SourceMLPredictionDto> PredictSourcesBatch(List<SourceMetricsDto> sources);
+
+
+        /// <summary>
+        /// Строит flow-признаки из списка сырых пакетов (извлечённых из .pcap).
+        /// Вызывает Python-модуль flow_features.py.
+        /// </summary>
+        List<FlowFeaturesDto> BuildFlowsFromPackets(
+            List<TrafficAnalysisAPI.Services.Implementations.RawPacket> packets);
+
+
+        /// <summary>
+        /// ML-предсказание для списка flow.
+        /// modelType: "rf" (RandomForest+IF, hybrid_ids_v2.pkl) или
+        ///            "catboost" (CatBoost+IF, catboost_ids_v2.pkl).
+        /// </summary>
+        List<FlowMLPredictionDto> PredictFlowsBatch(
+            List<TrafficAnalysisAPI.Models.FlowMetrics> flows,
+            string modelType = "rf");
+
     }
 }
