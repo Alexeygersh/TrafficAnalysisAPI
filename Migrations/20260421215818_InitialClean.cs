@@ -4,14 +4,48 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
+#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
+
 namespace TrafficAnalysisAPI.Migrations
 {
     /// <inheritdoc />
-    public partial class AddFlowMetrics : Migration
+    public partial class InitialClean : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "TrafficSessions",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    SessionName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    StartTime = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    EndTime = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    Description = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TrafficSessions", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Users",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Username = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    PasswordHash = table.Column<string>(type: "text", nullable: false),
+                    Role = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Users", x => x.Id);
+                });
+
             migrationBuilder.CreateTable(
                 name: "FlowMetrics",
                 columns: table => new
@@ -118,6 +152,47 @@ namespace TrafficAnalysisAPI.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "NetworkPackets",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    SourceIP = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: false),
+                    DestinationIP = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: false),
+                    Port = table.Column<int>(type: "integer", nullable: false),
+                    Protocol = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    PacketSize = table.Column<int>(type: "integer", nullable: false),
+                    Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    SessionId = table.Column<int>(type: "integer", nullable: true),
+                    FlowId = table.Column<int>(type: "integer", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_NetworkPackets", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_NetworkPackets_FlowMetrics_FlowId",
+                        column: x => x.FlowId,
+                        principalTable: "FlowMetrics",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_NetworkPackets_TrafficSessions_SessionId",
+                        column: x => x.SessionId,
+                        principalTable: "TrafficSessions",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.InsertData(
+                table: "Users",
+                columns: new[] { "Id", "CreatedAt", "PasswordHash", "Role", "Username" },
+                values: new object[,]
+                {
+                    { 1, new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "$2a$12$C83vSlJeLDe9HQKCTtAZauTtlT2s8sVbZtZIvGAmlrAR14wDDRkE.", "Admin", "admin" },
+                    { 2, new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "$2a$12$uMJ6PYfgWhWPNFTshq.o1uukT0yYAuju3J6mVv1M32MXtrFhpnYB2", "Analyst", "analyst" }
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_FlowMetrics_Protocol",
                 table: "FlowMetrics",
@@ -132,13 +207,58 @@ namespace TrafficAnalysisAPI.Migrations
                 name: "IX_FlowMetrics_SourceIP_DestinationIP",
                 table: "FlowMetrics",
                 columns: new[] { "SourceIP", "DestinationIP" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_FlowMetrics_ThreatLevel",
+                table: "FlowMetrics",
+                column: "ThreatLevel");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NetworkPackets_DestinationIP",
+                table: "NetworkPackets",
+                column: "DestinationIP");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NetworkPackets_FlowId",
+                table: "NetworkPackets",
+                column: "FlowId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NetworkPackets_SessionId",
+                table: "NetworkPackets",
+                column: "SessionId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NetworkPackets_SourceIP",
+                table: "NetworkPackets",
+                column: "SourceIP");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_NetworkPackets_Timestamp",
+                table: "NetworkPackets",
+                column: "Timestamp");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_Username",
+                table: "Users",
+                column: "Username",
+                unique: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "NetworkPackets");
+
+            migrationBuilder.DropTable(
+                name: "Users");
+
+            migrationBuilder.DropTable(
                 name: "FlowMetrics");
+
+            migrationBuilder.DropTable(
+                name: "TrafficSessions");
         }
     }
 }

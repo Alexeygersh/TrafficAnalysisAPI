@@ -98,41 +98,47 @@ def _compute_active_idle(timestamps):
 def _split_into_flows(packets):
     """
     Разбивает пакеты на flows с учётом FLOW_TIMEOUT.
-    Возвращает dict: flow_id -> list of packets (в хронологическом порядке).
+    Возвращает dict: flow_id -> list of (orig_index, packet).
     Flow_id это tuple (canonical_key, chunk_index).
+
+    ВАЖНО: orig_index — это позиция пакета в ИСХОДНОМ массиве (до сортировки),
+    именно она нужна C# для проставления FlowId на NetworkPackets.
     """
-    # Сортируем всё по времени
-    packets_sorted = sorted(
-        packets,
-        key=lambda p: float(_get(p, 'TimestampSec', 'timestampSec', default=0.0))
+    # Прикрепляем orig_index к каждому пакету, потом сортируем по времени
+    indexed = [(i, p) for i, p in enumerate(packets)]
+    indexed_sorted = sorted(
+        indexed,
+        key=lambda ip: float(_get(ip[1], 'TimestampSec', 'timestampSec', default=0.0))
     )
 
-    flows = defaultdict(list)
-    # last_time_for_key: когда последний раз видели пакет с таким ключом
+    flows = defaultdict(list)  # flow_id -> list of (orig_index, packet)
     last_time_for_key = {}
-    # chunk_index_for_key: сколько уже flows было с таким ключом (для timeout'а)
     chunk_idx_for_key = {}
 
-    for p in packets_sorted:
+    for orig_index, p in indexed_sorted:
         key = _canonical_key(p)
         t = float(_get(p, 'TimestampSec', 'timestampSec', default=0.0))
 
         if key in last_time_for_key:
             if t - last_time_for_key[key] > FLOW_TIMEOUT:
-                # timeout → новый flow
                 chunk_idx_for_key[key] = chunk_idx_for_key.get(key, 0) + 1
         else:
             chunk_idx_for_key[key] = 0
 
         flow_id = (key, chunk_idx_for_key[key])
-        flows[flow_id].append(p)
+        flows[flow_id].append((orig_index, p))
         last_time_for_key[key] = t
 
     return flows
 
 
 def _build_flow_features(flow_id, flow_packets):
-    """Строит полный набор признаков для одного flow."""
+    """Строит полный набор признаков для одного flow.
+    flow_packets теперь это список (orig_index, packet)
+    """
+    # ДОБАВЛЕНО: отделяем индексы и сами пакеты
+    packet_indices = [i for i, _ in flow_packets]
+    flow_packets = [p for _, p in flow_packets]
     # Определяем forward-направление по первому пакету
     first = flow_packets[0]
     fwd_src_ip = _get(first, 'SourceIP', 'sourceIP', default='')
@@ -394,6 +400,10 @@ def _build_flow_features(flow_id, flow_packets):
         'IdleStd': idle_std * 1_000_000,
         'IdleMax': idle_max * 1_000_000,
         'IdleMin': idle_min * 1_000_000,
+
+        # ДОБАВЛЕНО: индексы пакетов (в исходном массиве packets из C#),
+        # которые вошли в этот flow
+        'PacketIndices': packet_indices,
     }
 
 

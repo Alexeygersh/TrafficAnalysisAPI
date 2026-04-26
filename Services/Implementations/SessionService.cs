@@ -109,7 +109,6 @@ namespace TrafficAnalysisAPI.Services.Implementations
         {
             var session = await _context.TrafficSessions
                 .Include(s => s.Packets)
-                .ThenInclude(p => p.Analysis)
                 .FirstOrDefaultAsync(s => s.Id == id);
 
             if (session == null) return Enumerable.Empty<PacketDto>();
@@ -144,6 +143,7 @@ namespace TrafficAnalysisAPI.Services.Implementations
             var stats = new Dictionary<string, dynamic>
             {
                 ["TotalPackets"] = session.Packets?.Count ?? 0,
+                ["TotalFlows"] = session.Flows?.Count ?? 0,
                 ["UniqueSourceIPs"] = session.Packets?.Select(p => p.SourceIP).Distinct().Count() ?? 0,
                 ["UniqueDestinationIPs"] = session.Packets?.Select(p => p.DestinationIP).Distinct().Count() ?? 0,
                 ["AveragePacketSize"] = session.Packets?.Any() == true
@@ -190,7 +190,8 @@ namespace TrafficAnalysisAPI.Services.Implementations
                 StartTime = session.StartTime,
                 EndTime = session.EndTime,
                 Description = session.Description,
-                TotalPackets = session.Packets?.Count ?? 0
+                TotalPackets = session.Packets?.Count ?? 0,
+                TotalFlows = session.Flows?.Count ?? 0
             };
         }
 
@@ -207,16 +208,6 @@ namespace TrafficAnalysisAPI.Services.Implementations
                 Timestamp = packet.Timestamp,
                 SessionId = packet.SessionId,
                 SessionName = packet.Session?.SessionName,
-                Analysis = packet.Analysis == null ? null : new AnalysisDto
-                {
-                    Id = packet.Analysis.Id,
-                    PacketId = packet.Analysis.PacketId,
-                    ThreatLevel = packet.Analysis.ThreatLevel,
-                    IsMalicious = packet.Analysis.IsMalicious,
-                    MLModelScore = packet.Analysis.MLModelScore,
-                    DetectedAt = packet.Analysis.DetectedAt,
-                    Description = packet.Analysis.Description
-                }
             };
         }
     }

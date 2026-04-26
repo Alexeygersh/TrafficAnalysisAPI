@@ -3,7 +3,10 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TrafficAnalysisAPI.Models
 {
-    // Модель сетевого пакета ()
+    /// <summary>
+    /// Сетевой пакет. Привязан к сессии (SessionId) и, если разобран
+    /// из .pcap и попал во flow — к FlowMetrics (FlowId).
+    /// </summary>
     public class NetworkPacket
     {
         [Key]
@@ -11,70 +14,53 @@ namespace TrafficAnalysisAPI.Models
 
         [Required]
         [StringLength(45)]
-        public string SourceIP { get; set; }
+        public string SourceIP { get; set; } = "";
 
         [Required]
         [StringLength(45)]
-        public string DestinationIP { get; set; }
+        public string DestinationIP { get; set; } = "";
 
-        [Range(0, 65535)]
         public int Port { get; set; }
 
         [Required]
         [StringLength(10)]
-        public string Protocol { get; set; }
+        public string Protocol { get; set; } = "";
 
-        public int PacketSize { get; set; } // в байтах
+        public int PacketSize { get; set; }
 
-        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+        public DateTime Timestamp { get; set; }
+
+        // --- Связи ---
 
         public int? SessionId { get; set; }
 
         [ForeignKey("SessionId")]
         public TrafficSession? Session { get; set; }
 
-        public TrafficAnalysis? Analysis { get; set; }
+        /// <summary>
+        /// ID потока (FlowMetrics) к которому принадлежит пакет.
+        /// Null для пакетов вне flow (например, ARP, ICMPv6 пакеты без IP-payload).
+        /// </summary>
+        public int? FlowId { get; set; }
 
-        // Бизнес-логика: проверка, что пакет из того же источника
-        public bool IsFromSameSource(string ipAddress)
-        {
-            return SourceIP.Equals(ipAddress, StringComparison.OrdinalIgnoreCase);
-        }
+        [ForeignKey("FlowId")]
+        public FlowMetrics? Flow { get; set; }
 
-        // Бизнес-логика: расчет базового балла угрозы
+        // --- Бизнес-логика: расчёт threat score для пакета ---
+        // Оставляем минимальную логику для фильтров/сортировки в UI пакетов.
         public double CalculateThreatScore()
         {
             double score = 0;
 
             // Подозрительные порты
-            int[] suspiciousPorts = { 23, 135, 139, 445, 3389, 5900 };
-            if (suspiciousPorts.Contains(Port))
+            if (Port == 23 || Port == 3389 || Port == 445)
                 score += 30;
 
             // Большой размер пакета
             if (PacketSize > 1500)
                 score += 20;
 
-            // Необычные протоколы
-            if (Protocol != "TCP" && Protocol != "UDP" && Protocol != "ICMP")
-                score += 15;
-
             return Math.Min(score, 100);
-        }
-
-        // Бизнес-логика: категория пакета
-        public string GetPacketCategory()
-        {
-            if (Port == 80 || Port == 443)
-                return "Web Traffic";
-            else if (Port == 22 || Port == 23)
-                return "Remote Access";
-            else if (Port == 25 || Port == 110 || Port == 143)
-                return "Email";
-            else if (Port >= 1024)
-                return "High Port";
-            else
-                return "Other";
         }
     }
 }

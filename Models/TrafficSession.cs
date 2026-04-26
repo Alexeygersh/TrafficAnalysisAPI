@@ -3,8 +3,11 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TrafficAnalysisAPI.Models
 {
-
-    // Модель сессии мониторинга трафика
+    /// <summary>
+    /// Сессия мониторинга трафика. Одна сессия = один импорт .pcap
+    /// (или набор связанных пакетов). Содержит коллекции NetworkPackets
+    /// и FlowMetrics.
+    /// </summary>
     public class TrafficSession
     {
         [Key]
@@ -12,58 +15,42 @@ namespace TrafficAnalysisAPI.Models
 
         [Required]
         [StringLength(100)]
-        public string SessionName { get; set; }
+        public string SessionName { get; set; } = "";
 
         public DateTime StartTime { get; set; } = DateTime.UtcNow;
 
         public DateTime? EndTime { get; set; }
 
-        public List<NetworkPacket> Packets { get; set; } = new List<NetworkPacket>();
+        [StringLength(200)]
+        public string? Description { get; set; }
+
+        // --- Навигационные коллекции ---
+
+        public List<NetworkPacket> Packets { get; set; } = new();
+        public List<FlowMetrics> Flows { get; set; } = new();
+
+        // --- Computed ---
 
         [NotMapped]
         public int TotalPackets => Packets?.Count ?? 0;
 
-        [StringLength(200)]
-        public string? Description { get; set; }
+        [NotMapped]
+        public int TotalFlows => Flows?.Count ?? 0;
 
-        // Бизнес-логика: добавление пакета в сессию
+        [NotMapped]
+        public bool IsActive => !EndTime.HasValue;
+
+        // --- Бизнес-логика ---
+
         public void AddPacket(NetworkPacket packet)
         {
             if (EndTime.HasValue)
-                throw new InvalidOperationException("Нельзя добавлять пакеты в завершенную сессию");
+                throw new InvalidOperationException(
+                    "Нельзя добавлять пакеты в завершённую сессию");
 
             Packets.Add(packet);
             packet.SessionId = this.Id;
         }
-
-        // Бизнес-логика: получение аномальных пакетов
-        public List<NetworkPacket> GetAnomalousPackets()
-        {
-            return Packets
-                .Where(p => p.CalculateThreatScore() > 50)
-                .OrderByDescending(p => p.CalculateThreatScore())
-                .ToList();
-        }
-
-        // Бизнес-логика: расчет статистики сессии
-        public Dictionary<string, object> CalculateStatistics()
-        {
-            var stats = new Dictionary<string, object>
-            {
-                ["TotalPackets"] = TotalPackets,
-                ["UniqueSourceIPs"] = Packets.Select(p => p.SourceIP).Distinct().Count(),
-                ["UniqueDestinationIPs"] = Packets.Select(p => p.DestinationIP).Distinct().Count(),
-                ["AveragePacketSize"] = Packets.Any() ? Packets.Average(p => p.PacketSize) : 0,
-                ["MostUsedProtocol"] = Packets.GroupBy(p => p.Protocol)
-                                              .OrderByDescending(g => g.Count())
-                                              .FirstOrDefault()?.Key ?? "N/A",
-                ["AnomalousPacketsCount"] = GetAnomalousPackets().Count,
-                ["Duration"] = EndTime.HasValue
-                    ? (EndTime.Value - StartTime).TotalMinutes
-                    : (DateTime.UtcNow - StartTime).TotalMinutes
-            };
-
-            return stats;
-        }
     }
 }
+

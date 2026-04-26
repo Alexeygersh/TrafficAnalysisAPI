@@ -34,7 +34,6 @@
         public DateTime Timestamp { get; set; }
         public int? SessionId { get; set; }
         public string? SessionName { get; set; }
-        public AnalysisDto? Analysis { get; set; }
     }
 
     // DTO для балла угрозы

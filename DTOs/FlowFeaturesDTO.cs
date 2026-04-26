@@ -115,18 +115,31 @@
         public double IdleStd { get; set; }
         public double IdleMax { get; set; }
         public double IdleMin { get; set; }
+
+
+        /// Индексы пакетов (в исходном массиве RawPacket из C#),
+        /// вошедших в этот flow. Приходит из Python.
+        /// Нужно чтобы C# после сохранения flow в БД проставил
+        /// FlowId в соответствующих NetworkPacket.
+        public List<int> PacketIndices { get; set; } = new();
     }
 
-    /// <summary>
+
     /// Результат импорта .pcap файла.
-    /// </summary>
     public class PcapImportResultDto
     {
         public int SessionId { get; set; }
         public string SessionName { get; set; } = "";
+
+        // Статистика парсинга
         public int RawPacketsParsed { get; set; }
         public int FlowsBuilt { get; set; }
         public int FlowsSavedToDb { get; set; }
+
+        // Статистика по пакетам в БД
+        public int PacketsSavedToDb { get; set; }
+        public int PacketsLinkedToFlows { get; set; }
+
         public Dictionary<string, int> ProtocolStats { get; set; } = new();
         public long ElapsedMs { get; set; }
     }

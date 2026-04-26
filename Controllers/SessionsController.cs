@@ -19,7 +19,7 @@ namespace TrafficAnalysisAPI.Controllers
         }
 
         [HttpGet]
-        [Authorize(Policy = "AuthorizedUser")]
+        //[Authorize(Policy = "AuthorizedUser")]
         [ProducesResponseType(typeof(IEnumerable<SessionDto>), StatusCodes.Status200OK)]
         public async Task<ActionResult<IEnumerable<SessionDto>>> GetSessions()
         {
@@ -28,7 +28,7 @@ namespace TrafficAnalysisAPI.Controllers
         }
 
         [HttpGet("{id}")]
-        [Authorize(Policy = "AuthorizedUser")]
+        //[Authorize(Policy = "AuthorizedUser")]
         [ProducesResponseType(typeof(SessionDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<SessionDto>> GetSession(int id)
@@ -42,7 +42,7 @@ namespace TrafficAnalysisAPI.Controllers
         }
 
         [HttpPost]
-        [Authorize(Policy = "AdminOnly")]
+        //[Authorize(Policy = "AdminOnly")]
         [ProducesResponseType(typeof(SessionDto), StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<SessionDto>> CreateSession([FromBody] CreateSessionDto dto)
@@ -60,7 +60,7 @@ namespace TrafficAnalysisAPI.Controllers
         }
 
         [HttpPut("{id}")]
-        [Authorize(Policy = "AdminOnly")]
+        //[Authorize(Policy = "AdminOnly")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> UpdateSession(int id, [FromBody] CreateSessionDto dto)
@@ -74,7 +74,7 @@ namespace TrafficAnalysisAPI.Controllers
         }
 
         [HttpDelete("{id}")]
-        [Authorize(Policy = "AdminOnly")]
+        //[Authorize(Policy = "AdminOnly")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> DeleteSession(int id)
@@ -88,7 +88,7 @@ namespace TrafficAnalysisAPI.Controllers
         }
 
         [HttpGet("statistics/{id}")]
-        [Authorize(Policy = "AuthorizedUser")]
+        //[Authorize(Policy = "AuthorizedUser")]
         [ProducesResponseType(typeof(SessionStatisticsDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<SessionStatisticsDto>> GetStatistics(int id)
@@ -102,7 +102,7 @@ namespace TrafficAnalysisAPI.Controllers
         }
 
         [HttpGet("anomalous-packets/{id}")]
-        [Authorize(Policy = "AuthorizedUser")]
+        //[Authorize(Policy = "AuthorizedUser")]
         [ProducesResponseType(typeof(IEnumerable<PacketDto>), StatusCodes.Status200OK)]
         public async Task<ActionResult<IEnumerable<PacketDto>>> GetAnomalousPackets(int id)
         {
@@ -111,7 +111,7 @@ namespace TrafficAnalysisAPI.Controllers
         }
 
         [HttpPost("close/{id}")]
-        [Authorize(Policy = "AdminOnly")]
+        //[Authorize(Policy = "AdminOnly")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]

@@ -308,6 +308,8 @@ namespace TrafficAnalysisAPI.Migrations
 
                     b.HasIndex("SessionId");
 
+                    b.HasIndex("ThreatLevel");
+
                     b.HasIndex("SourceIP", "DestinationIP");
 
                     b.ToTable("FlowMetrics");
@@ -325,6 +327,9 @@ namespace TrafficAnalysisAPI.Migrations
                         .IsRequired()
                         .HasMaxLength(45)
                         .HasColumnType("character varying(45)");
+
+                    b.Property<int?>("FlowId")
+                        .HasColumnType("integer");
 
                     b.Property<int>("PacketSize")
                         .HasColumnType("integer");
@@ -352,6 +357,8 @@ namespace TrafficAnalysisAPI.Migrations
 
                     b.HasIndex("DestinationIP");
 
+                    b.HasIndex("FlowId");
+
                     b.HasIndex("SessionId");
 
                     b.HasIndex("SourceIP");
@@ -359,207 +366,6 @@ namespace TrafficAnalysisAPI.Migrations
                     b.HasIndex("Timestamp");
 
                     b.ToTable("NetworkPackets");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            DestinationIP = "10.0.0.1",
-                            PacketSize = 500,
-                            Port = 80,
-                            Protocol = "TCP",
-                            SessionId = 1,
-                            SourceIP = "192.168.1.1",
-                            Timestamp = new DateTime(2025, 10, 19, 12, 5, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 2,
-                            DestinationIP = "10.0.0.2",
-                            PacketSize = 2000,
-                            Port = 23,
-                            Protocol = "TCP",
-                            SessionId = 1,
-                            SourceIP = "45.142.120.15",
-                            Timestamp = new DateTime(2025, 10, 19, 12, 10, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 3,
-                            DestinationIP = "10.0.0.3",
-                            PacketSize = 1800,
-                            Port = 445,
-                            Protocol = "TCP",
-                            SessionId = 1,
-                            SourceIP = "45.142.120.15",
-                            Timestamp = new DateTime(2025, 10, 19, 12, 15, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 4,
-                            DestinationIP = "10.0.0.4",
-                            PacketSize = 1600,
-                            Port = 3389,
-                            Protocol = "TCP",
-                            SessionId = 1,
-                            SourceIP = "192.168.1.2",
-                            Timestamp = new DateTime(2025, 10, 19, 12, 20, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 5,
-                            DestinationIP = "10.0.0.5",
-                            PacketSize = 600,
-                            Port = 443,
-                            Protocol = "HTTPS",
-                            SessionId = 1,
-                            SourceIP = "45.142.120.15",
-                            Timestamp = new DateTime(2025, 10, 19, 12, 25, 0, 0, DateTimeKind.Utc)
-                        });
-                });
-
-            modelBuilder.Entity("TrafficAnalysisAPI.Models.SourceMetrics", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<double>("AveragePacketSize")
-                        .HasColumnType("double precision");
-
-                    b.Property<DateTime>("CalculatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("ClusterId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ClusterName")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<double>("DangerScore")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("Duration")
-                        .HasColumnType("double precision");
-
-                    b.Property<bool>("IsDangerous")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("PacketCount")
-                        .HasColumnType("integer");
-
-                    b.Property<double>("PacketsPerSecond")
-                        .HasColumnType("double precision");
-
-                    b.Property<string>("Protocols")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<int?>("SessionId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("SourceIP")
-                        .IsRequired()
-                        .HasMaxLength(45)
-                        .HasColumnType("character varying(45)");
-
-                    b.Property<long>("TotalBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("UniquePorts")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClusterId");
-
-                    b.HasIndex("IsDangerous");
-
-                    b.HasIndex("SessionId");
-
-                    b.HasIndex("SourceIP");
-
-                    b.ToTable("SourceMetrics");
-                });
-
-            modelBuilder.Entity("TrafficAnalysisAPI.Models.TrafficAnalysis", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTime>("DetectedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsMalicious")
-                        .HasColumnType("boolean");
-
-                    b.Property<double>("MLModelScore")
-                        .HasColumnType("double precision");
-
-                    b.Property<int>("PacketId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ThreatLevel")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PacketId")
-                        .IsUnique();
-
-                    b.HasIndex("ThreatLevel");
-
-                    b.ToTable("TrafficAnalyses");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            DetectedAt = new DateTime(2025, 10, 19, 12, 10, 0, 0, DateTimeKind.Utc),
-                            IsMalicious = true,
-                            MLModelScore = 0.69999999999999996,
-                            PacketId = 2,
-                            ThreatLevel = "High"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            DetectedAt = new DateTime(2025, 10, 19, 12, 15, 0, 0, DateTimeKind.Utc),
-                            IsMalicious = true,
-                            MLModelScore = 0.84999999999999998,
-                            PacketId = 3,
-                            ThreatLevel = "Critical"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            DetectedAt = new DateTime(2025, 10, 19, 12, 20, 0, 0, DateTimeKind.Utc),
-                            IsMalicious = false,
-                            MLModelScore = 0.5,
-                            PacketId = 4,
-                            ThreatLevel = "Medium"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            DetectedAt = new DateTime(2025, 10, 19, 12, 25, 0, 0, DateTimeKind.Utc),
-                            IsMalicious = false,
-                            MLModelScore = 0.29999999999999999,
-                            PacketId = 5,
-                            ThreatLevel = "Low"
-                        });
                 });
 
             modelBuilder.Entity("TrafficAnalysisAPI.Models.TrafficSession", b =>
@@ -588,15 +394,6 @@ namespace TrafficAnalysisAPI.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("TrafficSessions");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Description = "Тестовая сессия для демонстрации",
-                            SessionName = "Test Session 2025-01-12",
-                            StartTime = new DateTime(2025, 10, 19, 12, 0, 0, 0, DateTimeKind.Utc)
-                        });
                 });
 
             modelBuilder.Entity("TrafficAnalysisAPI.Models.User", b =>
@@ -653,7 +450,7 @@ namespace TrafficAnalysisAPI.Migrations
             modelBuilder.Entity("TrafficAnalysisAPI.Models.FlowMetrics", b =>
                 {
                     b.HasOne("TrafficAnalysisAPI.Models.TrafficSession", "Session")
-                        .WithMany()
+                        .WithMany("Flows")
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -663,41 +460,25 @@ namespace TrafficAnalysisAPI.Migrations
 
             modelBuilder.Entity("TrafficAnalysisAPI.Models.NetworkPacket", b =>
                 {
+                    b.HasOne("TrafficAnalysisAPI.Models.FlowMetrics", "Flow")
+                        .WithMany()
+                        .HasForeignKey("FlowId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("TrafficAnalysisAPI.Models.TrafficSession", "Session")
                         .WithMany("Packets")
                         .HasForeignKey("SessionId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("Session");
-                });
-
-            modelBuilder.Entity("TrafficAnalysisAPI.Models.SourceMetrics", b =>
-                {
-                    b.HasOne("TrafficAnalysisAPI.Models.TrafficSession", "Session")
-                        .WithMany()
-                        .HasForeignKey("SessionId");
+                    b.Navigation("Flow");
 
                     b.Navigation("Session");
-                });
-
-            modelBuilder.Entity("TrafficAnalysisAPI.Models.TrafficAnalysis", b =>
-                {
-                    b.HasOne("TrafficAnalysisAPI.Models.NetworkPacket", "Packet")
-                        .WithOne("Analysis")
-                        .HasForeignKey("TrafficAnalysisAPI.Models.TrafficAnalysis", "PacketId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Packet");
-                });
-
-            modelBuilder.Entity("TrafficAnalysisAPI.Models.NetworkPacket", b =>
-                {
-                    b.Navigation("Analysis");
                 });
 
             modelBuilder.Entity("TrafficAnalysisAPI.Models.TrafficSession", b =>
                 {
+                    b.Navigation("Flows");
+
                     b.Navigation("Packets");
                 });
 #pragma warning restore 612, 618

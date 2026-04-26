@@ -30,40 +30,12 @@ else
     pythonDll = "/Library/Frameworks/Python.framework/Versions/3.13/lib/libpython3.13.dylib";
 }
 
-try
-{
-    Runtime.PythonDLL = pythonDll;
-    PythonEngine.Initialize();
-    PythonEngine.BeginAllowThreads();
-    Console.WriteLine("Python.NET initialized successfully");
 
-    // ========================================
-    //  НОВОЕ: ЗАГРУЗКА ML МОДЕЛИ ПРИ СТАРТЕ
-    // ========================================
-    using (Py.GIL())
-    {
-        // 1. Загрузка кластеризации
-        Console.WriteLine("Loading optimized clustering...");
-        dynamic clustering = Py.Import("optimized_clustering");
-        clustering.OptimizedClustering.load_or_create("models/clustering_model.pkl");
-        Console.WriteLine("Optimized clustering loaded");
+Runtime.PythonDLL = pythonDll;
+PythonEngine.Initialize();
+PythonEngine.BeginAllowThreads();
+Console.WriteLine("Python.NET initialized successfully");
 
-        // 2. Загрузка ML модели
-        Console.WriteLine("Loading ML model...");
-        dynamic ml = Py.Import("/PythonScripts/hybrid_ids");
-        ml.HybridIDS.load("MLModels/hybrid_ids_v1.pkl");
-        Console.WriteLine("ML model loaded");
-
-        Console.WriteLine("All Python models loaded successfully!");
-    }
-
-
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"Python.NET initialization failed: {ex.Message}");
-    // Не прерываем запуск, API будет работать без ML-функций
-}
 
 // === ЛОГИРОВАНИЕ ===
 builder.Logging.ClearProviders();
@@ -77,9 +49,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // === РЕГИСТРАЦИЯ СЕРВИСОВ ===
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPacketService, PacketService>();
-builder.Services.AddScoped<IAnalysisService, AnalysisService>();
 builder.Services.AddScoped<ISessionService, SessionService>();
-builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IPythonMLService, PythonMLService>();
 builder.Services.AddScoped<IPcapParserService, PcapParserService>();
 

@@ -22,7 +22,6 @@ namespace TrafficAnalysisAPI.Services.Implementations
         {
             var packets = await _context.NetworkPackets
                 .Include(p => p.Session)
-                .Include(p => p.Analysis)
                 .OrderByDescending(p => p.Timestamp)
                 .ToListAsync();
 
@@ -33,7 +32,6 @@ namespace TrafficAnalysisAPI.Services.Implementations
         {
             var packet = await _context.NetworkPackets
                 .Include(p => p.Session)
-                .Include(p => p.Analysis)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
             return packet == null ? null : MapToDto(packet);
@@ -170,16 +168,6 @@ namespace TrafficAnalysisAPI.Services.Implementations
                 Timestamp = packet.Timestamp,
                 SessionId = packet.SessionId,
                 SessionName = packet.Session?.SessionName,
-                Analysis = packet.Analysis == null ? null : new AnalysisDto
-                {
-                    Id = packet.Analysis.Id,
-                    PacketId = packet.Analysis.PacketId,
-                    ThreatLevel = packet.Analysis.ThreatLevel,
-                    IsMalicious = packet.Analysis.IsMalicious,
-                    MLModelScore = packet.Analysis.MLModelScore,
-                    DetectedAt = packet.Analysis.DetectedAt,
-                    Description = packet.Analysis.Description
-                }
             };
         }
     }

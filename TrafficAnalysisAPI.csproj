@@ -26,6 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Migrations\" />
     <Folder Include="PythonScripts\data\cicids2017\attack\" />
     <Folder Include="Uploads\" />
   </ItemGroup>

@@ -14,6 +14,7 @@
         public DateTime? EndTime { get; set; }
         public string? Description { get; set; }
         public int TotalPackets { get; set; }
+        public int TotalFlows { get; set; }
         public bool IsActive => !EndTime.HasValue;
     }
 
