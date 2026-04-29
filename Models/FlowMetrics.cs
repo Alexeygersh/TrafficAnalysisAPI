@@ -28,7 +28,7 @@ namespace TrafficAnalysisAPI.Models
         public int SourcePort { get; set; }
         public int DestinationPort { get; set; }
 
-        [Required, StringLength(10)]
+        [Required, StringLength(30)]
         public string Protocol { get; set; } = "";
 
         public DateTime FlowStartTime { get; set; }

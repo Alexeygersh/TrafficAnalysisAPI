@@ -168,6 +168,7 @@ namespace TrafficAnalysisAPI.Services.Implementations
                 Timestamp = packet.Timestamp,
                 SessionId = packet.SessionId,
                 SessionName = packet.Session?.SessionName,
+                FlowId = packet.FlowId,
             };
         }
     }

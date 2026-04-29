@@ -34,6 +34,7 @@
         public DateTime Timestamp { get; set; }
         public int? SessionId { get; set; }
         public string? SessionName { get; set; }
+        public int? FlowId { get; set; }
     }
 
     // DTO для балла угрозы

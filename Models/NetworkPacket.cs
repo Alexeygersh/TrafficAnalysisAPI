@@ -23,7 +23,7 @@ namespace TrafficAnalysisAPI.Models
         public int Port { get; set; }
 
         [Required]
-        [StringLength(10)]
+        [StringLength(30)]
         public string Protocol { get; set; } = "";
 
         public int PacketSize { get; set; }

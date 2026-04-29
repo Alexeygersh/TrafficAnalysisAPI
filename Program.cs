@@ -15,7 +15,30 @@ using TrafficAnalysisAPI.Services.Interfaces;
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 var builder = WebApplication.CreateBuilder(args);
 
-// === PYTHON.NET »Ќ»÷»јЋ»«ј÷»я (ќƒ»Ќ –ј«!) ===
+const long MaxUploadSize = 2L * 1024 * 1024 * 1024;  // 2 GB
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // Ћимит на тело запроса (Kestrel-уровень)
+    options.Limits.MaxRequestBodySize = MaxUploadSize;
+});
+
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    // Ћимиты на multipart/form-data
+    options.MultipartBodyLengthLimit = MaxUploadSize;
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartHeadersLengthLimit = int.MaxValue;
+});
+
+//builder.Services.Configure<Microsoft.AspNetCore.Server.IIS.IISServerOptions>(options =>
+//{
+//    // ≈сли когда-нибудь развернЄшь под IIS Ч лимит и там
+//    options.MaxRequestBodySize = MaxUploadSize;
+//});
+
+
+// === PYTHON.NET »Ќ»÷»јЋ»«ј÷»я ===
 string pythonDll;
 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
 {

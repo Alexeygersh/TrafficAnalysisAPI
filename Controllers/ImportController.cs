@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using TrafficAnalysisAPI.Data;
 using TrafficAnalysisAPI.DTOs;
@@ -43,6 +44,8 @@ namespace TrafficAnalysisAPI.Controllers
         ///      WHERE id IN (packet_indices_для_этого_flow)
         /// </summary>
         [HttpPost("pcap")]
+        [RequestSizeLimit(2L * 1024 * 1024 * 1024)]                  // 2 GB
+        [RequestFormLimits(MultipartBodyLengthLimit = 2L * 1024 * 1024 * 1024)]
         [ProducesResponseType(typeof(PcapImportResultDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<PcapImportResultDto>> ImportPcap(
