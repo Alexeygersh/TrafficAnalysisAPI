@@ -33,7 +33,6 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 
 //builder.Services.Configure<Microsoft.AspNetCore.Server.IIS.IISServerOptions>(options =>
 //{
-//    // Если когда-нибудь развернёшь под IIS — лимит и там
 //    options.MaxRequestBodySize = MaxUploadSize;
 //});
 

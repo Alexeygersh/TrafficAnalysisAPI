@@ -1,60 +1,59 @@
 ﻿namespace TrafficAnalysisAPI.DTOs.ML
 {
-    /// <summary>
-    /// Результат сравнения двух моделей на одной сессии.
-    /// Возвращается из POST /api/ml/compare?sessionId=X
-    /// </summary>
+    // Результат сравнения двух моделей на одной сессии.
+    // Возвращается из POST /api/ml/compare?sessionId=X
+
     public class ModelCompareResultDto
     {
         public int SessionId { get; set; }
         public int TotalFlows { get; set; }
 
-        /// <summary>Сводка по модели Random Forest</summary>
+        // Сводка по модели Random Forest
         public ModelSummaryDto RfModel { get; set; } = new();
 
-        /// <summary>Сводка по модели CatBoost</summary>
+        // Сводка по модели CatBoost
         public ModelSummaryDto CatBoostModel { get; set; } = new();
 
-        /// <summary>Согласованность моделей (сколько совпадают)</summary>
+        // Согласованность моделей (сколько совпадают)
         public AgreementStatsDto Agreement { get; set; } = new();
 
-        /// <summary>Попарное сравнение предсказаний на каждом flow</summary>
+        // Попарное сравнение предсказаний на каждом flow
         public List<FlowComparisonRowDto> Comparison { get; set; } = new();
     }
 
-    /// <summary>Краткая сводка по одной модели в рамках сравнения.</summary>
+    // Краткая сводка по одной модели в рамках сравнения
     public class ModelSummaryDto
     {
-        /// <summary>Сколько flows эта модель отметила как атаки</summary>
+        // Сколько flows эта модель отметила как атаки
         public int AttackFlows { get; set; }
 
-        /// <summary>Время инференса в мс</summary>
+        // Время инференса в мс
         public long ElapsedMs { get; set; }
 
-        /// <summary>Список признаков на которых модель обучалась</summary>
+        // Список признаков на которых модель обучалась
         public List<string> Features { get; set; } = new();
 
-        /// <summary>Метрики качества (accuracy/f1/roc_auc) из обучения</summary>
+        // Метрики качества (accuracy/f1/roc_auc) из обучения
         public Dictionary<string, object>? Metrics { get; set; }
     }
 
-    /// <summary>Статистика согласованности двух моделей.</summary>
+    // Статистика согласованности двух моделей
     public class AgreementStatsDto
     {
-        /// <summary>Обе модели сказали "атака"</summary>
+        // Обе модели сказали "атака"
         public int BothAttack { get; set; }
 
-        /// <summary>Обе модели сказали "норма"</summary>
+        // Обе модели сказали "норма"
         public int BothNormal { get; set; }
 
-        /// <summary>Модели разошлись</summary>
+        // Модели разошлись
         public int Disagree { get; set; }
 
-        /// <summary>Доля согласия: (BothAttack + BothNormal) / Total</summary>
+        // Доля согласия: (BothAttack + BothNormal) / Total
         public double AgreementRate { get; set; }
     }
 
-    /// <summary>Попарное сравнение предсказаний на одном flow.</summary>
+    // Попарное сравнение предсказаний на одном flow
     public class FlowComparisonRowDto
     {
         public int FlowId { get; set; }
@@ -75,7 +74,7 @@
         public string CatBoostThreatLevel { get; set; } = "Low";
         public string CatBoostMethod { get; set; } = "none";
 
-        /// <summary>Согласны ли модели (обе атака или обе норма)</summary>
+        // Согласны ли модели (обе атака или обе норма)
         public bool Agree { get; set; }
     }
 }

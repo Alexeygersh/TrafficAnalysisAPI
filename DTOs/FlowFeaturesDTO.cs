@@ -1,10 +1,10 @@
 ﻿namespace TrafficAnalysisAPI.DTOs
 {
-    /// <summary>
-    /// DTO для одного flow, построенного Python-модулем flow_features.py.
-    /// Содержит все ~78 признаков из CICFlowMeter.
-    /// Используется для передачи данных между C# и Python + сохранения в БД.
-    /// </summary>
+
+    // DTO для одного flow, построенного Python-модулем flow_features.py.
+    // Содержит все ~78 признаков из CICFlowMeter.
+    // Используется для передачи данных между C# и Python + сохранения в БД.
+
     public class FlowFeaturesDto
     {
         // --- Идентификация ---
@@ -117,15 +117,13 @@
         public double IdleMin { get; set; }
 
 
-        /// Индексы пакетов (в исходном массиве RawPacket из C#),
-        /// вошедших в этот flow. Приходит из Python.
-        /// Нужно чтобы C# после сохранения flow в БД проставил
-        /// FlowId в соответствующих NetworkPacket.
+        // Индексы пакетов (в исходном массиве RawPacket из C#), вошедших в этот flow. Приходит из Python
+        // Нужно чтобы C# после сохранения flow в БД проставил FlowId в соответствующих NetworkPacket
         public List<int> PacketIndices { get; set; } = new();
     }
 
 
-    /// Результат импорта .pcap файла.
+    // Результат импорта .pcap файла.
     public class PcapImportResultDto
     {
         public int SessionId { get; set; }

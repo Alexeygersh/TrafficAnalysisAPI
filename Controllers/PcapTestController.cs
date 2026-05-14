@@ -4,10 +4,10 @@ using TrafficAnalysisAPI.Services.Implementations;
 
 namespace TrafficAnalysisAPI.Controllers
 {
-    /// <summary>
-    /// ВРЕМЕННЫЙ контроллер для проверки парсера .pcap.
-    /// Удалить/отключить после того как убедимся что SharpPcap работает корректно.
-    /// </summary>
+
+    // ВРЕМЕННЫЙ контроллер для проверки парсера .pcap.
+    // Удалить/отключить после того как убедимся что SharpPcap работает корректно.
+
     [Route("api/[controller]")]
     [ApiController]
     [Authorize(Policy = "AdminOnly")]
@@ -22,11 +22,11 @@ namespace TrafficAnalysisAPI.Controllers
             _logger = logger;
         }
 
-        /// <summary>
-        /// POST /api/pcaptest/parse
-        /// Принимает .pcap файл, парсит и возвращает статистику.
-        /// НЕ сохраняет в БД — только диагностика.
-        /// </summary>
+
+        // POST /api/pcaptest/parse
+        // Принимает .pcap файл, парсит и возвращает статистику.
+        // НЕ сохраняет в БД — только диагностика.
+
         [HttpPost("parse")]
         public async Task<IActionResult> ParsePcap(IFormFile file)
         {

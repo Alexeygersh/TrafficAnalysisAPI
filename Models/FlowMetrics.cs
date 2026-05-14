@@ -3,11 +3,11 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TrafficAnalysisAPI.Models
 {
-    /// <summary>
-    /// Агрегированные метрики одного сетевого потока (flow).
-    /// Flow = пятёрка (SrcIP, DstIP, SrcPort, DstPort, Protocol) в рамках сессии.
-    /// Все признаки — CICIDS-совместимые, используются для обучения ML-моделей.
-    /// </summary>
+
+    // Агрегированные метрики одного сетевого потока (flow).
+    // Flow = пятёрка (SrcIP, DstIP, SrcPort, DstPort, Protocol) в рамках сессии.
+    // Все признаки — CICIDS-совместимые, используются для обучения ML-моделей.
+
     public class FlowMetrics
     {
         [Key]
@@ -38,7 +38,7 @@ namespace TrafficAnalysisAPI.Models
         // БЛОК: Базовые характеристики потока
         // ========================================================
 
-        /// <summary>Общая длительность потока в микросекундах</summary>
+        // Общая длительность потока в микросекундах
         public double FlowDuration { get; set; }
 
         public int TotalFwdPackets { get; set; }
@@ -171,17 +171,17 @@ namespace TrafficAnalysisAPI.Models
         // БЛОК: Результаты анализа (заполняются после ML)
         // ========================================================
 
-        /// <summary>Метка для supervised-обучения: 0 = норма, 1 = атака (если размечено)</summary>
+        // Метка для supervised-обучения: 0 = норма, 1 = атака (если размечено)
         public int? Label { get; set; }
 
-        /// <summary>Оценка угрозы от текущей модели (0..1)</summary>
+        // Оценка угрозы от текущей модели (0..1)
         public double? ThreatScore { get; set; }
 
-        /// <summary>Уровень: Low/Medium/High/Critical</summary>
+        // Уровень: Low/Medium/High/Critical
         [StringLength(20)]
         public string? ThreatLevel { get; set; }
 
-        /// <summary>Какая модель сделала предсказание: rf | catboost | ensemble</summary>
+        // Какая модель сделала предсказание: rf | catboost | ensemble
         [StringLength(20)]
         public string? PredictedBy { get; set; }
     }

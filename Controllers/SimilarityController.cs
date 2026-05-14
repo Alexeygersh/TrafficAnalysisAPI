@@ -8,19 +8,19 @@ using TrafficAnalysisAPI.Services.Interfaces;
 
 namespace TrafficAnalysisAPI.Controllers
 {
-    /// <summary>
-    /// Endpoint для меры сходства между flows.
-    /// Реализует формулу из ТЗ диплома:
-    ///   Sim = w1·Sim_port + w2·Sim_num + w3·Sim_bin
-    ///
-    /// Два режима:
-    ///   POST /api/similarity/find         — поиск top-K похожих на target flow
-    ///   POST /api/similarity/knn-classify — kNN-классификация всех flows
-    ///                                       (альтернативный детектор атак)
-    /// </summary>
+
+    // Endpoint для меры сходства между flows.
+    // Реализует формулу из ТЗ диплома:
+    //   Sim = w1·Sim_port + w2·Sim_num + w3·Sim_bin
+    //
+    // Два режима:
+    //   POST /api/similarity/find         — поиск top-K похожих на target flow
+    //   POST /api/similarity/knn-classify — kNN-классификация всех flows
+    //                                       (альтернативный детектор атак)
+
     [Route("api/[controller]")]
     [ApiController]
-    //[Authorize(Policy = "AuthorizedUser")]
+    [Authorize(Policy = "AuthorizedUser")]
     public class SimilarityController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -40,10 +40,10 @@ namespace TrafficAnalysisAPI.Controllers
         // ============================================================
         // РЕЖИМ 1: Поиск похожих flows
         // ============================================================
-        /// <summary>
+
         /// POST /api/similarity/find?targetFlowId=Y&amp;w1=0.10&amp;w2=0.60&amp;w3=0.30&amp;k=10[&amp;sessionId=X]
         /// Находит топ-K flows наиболее похожих на target по формуле.
-        /// </summary>
+
         [HttpPost("find")]
         public async Task<IActionResult> FindSimilar(
             [FromQuery] int targetFlowId,
@@ -108,15 +108,15 @@ namespace TrafficAnalysisAPI.Controllers
         // ============================================================
         // РЕЖИМ 2: kNN-классификация (детектор на мере сходства)
         // ============================================================
-        /// <summary>
+
         /// POST /api/similarity/knn-classify?sessionId=X&amp;w1=0.10&amp;w2=0.60&amp;w3=0.30&amp;k=5&amp;model=rf
         /// Прогоняет ML-модель (RF или CatBoost) для получения "истинных" меток,
         /// затем для каждого flow считает kNN-предсказание на основе меры сходства
         /// и сравнивает с меткой ML.
-        ///
+        /// 
         /// Это позволяет оценить кастомную меру сходства как самостоятельный
         /// классификатор, без обучения градиентных деревьев.
-        /// </summary>
+
         [HttpPost("knn-classify")]
         public async Task<IActionResult> KnnClassify(
             [FromQuery] int sessionId,
@@ -186,9 +186,8 @@ namespace TrafficAnalysisAPI.Controllers
             }
         }
 
-        // ============================================================
-        // Helper: парсинг JsonElement в Dictionary рекурсивно
-        // ============================================================
+
+        // парсинг JsonElement в Dictionary рекурсивно
         private static Dictionary<string, object> JsonElementToDict(JsonElement elem)
         {
             var dict = new Dictionary<string, object>();

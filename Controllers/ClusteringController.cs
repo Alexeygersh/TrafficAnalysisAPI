@@ -5,10 +5,10 @@ using TrafficAnalysisAPI.Data;
 
 namespace TrafficAnalysisAPI.Controllers
 {
-    /// <summary>
-    /// Временный shim — пока фронтенд использует /api/clustering/sessions.
-    /// В финальной чистке перенести этот endpoint в SessionsController.
-    /// </summary>
+
+    // Временный shim — пока фронтенд использует /api/clustering/sessions
+    // В финальной версии перенести этот endpoint в SessionsController
+
     [Route("api/[controller]")]
     [ApiController]
     [Authorize(Policy = "AuthorizedUser")]

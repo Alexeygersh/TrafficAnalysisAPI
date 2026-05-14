@@ -57,8 +57,9 @@ class CatBoostIDS:
         print(f"[CatBoostIDS] Training on {X_train.shape[0]} samples, "
               f"{len(feature_names)} features")
 
-        # CatBoost работает лучше без стандартизации, но мы скейлим для консистентности
-        # с hybrid_ids (чтобы IF работал на тех же scaled-данных)
+        # CatBoost показывает лучший результат без нормализации признаков.
+        # Однако данные масштабируются для совместимости с hybrid_ids,
+        # поскольку Isolation Forest требует одинакового масштаба входных данных
         self.scaler = StandardScaler()
         X_scaled = self.scaler.fit_transform(X_train)
 
@@ -128,7 +129,7 @@ class CatBoostIDS:
         joblib.dump(payload, model_path)
         print(f"[CatBoostIDS] Модель сохранена: {model_path}")
 
-        # Инвалидируем кеш
+        # Очищаем кеш
         abs_path = os.path.abspath(model_path)
         stale = [k for k in _CB_MODEL_CACHE.keys() if k.startswith(abs_path + "::")]
         for k in stale:
@@ -194,7 +195,7 @@ class CatBoostIDS:
         if not items:
             return json.dumps([])
 
-        # Матрица фичей
+        # Формируем матрицу признаков
         feat_matrix = []
         for item in items:
             vec = []
@@ -213,7 +214,7 @@ class CatBoostIDS:
         X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
         X_scaled = self.scaler.transform(X)
 
-        # Батч-инференс
+        # Получаем предсказания от обоих моделей на батче
         cb_preds = self.supervised.predict(X_scaled).flatten().astype(int)
         cb_probas = self.supervised.predict_proba(X_scaled)[:, 1]
         if_raw = self.anomaly_detector.predict(X_scaled)

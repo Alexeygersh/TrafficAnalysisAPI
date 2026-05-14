@@ -33,18 +33,17 @@ namespace TrafficAnalysisAPI.Controllers
             _logger = logger;
         }
 
-        /// <summary>
-        /// POST /api/import/pcap
-        /// Импорт .pcap файла:
-        ///   1. Парсинг → List&lt;RawPacket&gt;
-        ///   2. Построение flows через Python → List&lt;FlowFeaturesDto&gt;
-        ///   3. Сохранение пакетов в NetworkPackets (id присваиваются БД)
-        ///   4. Сохранение flows в FlowMetrics (id присваиваются БД)
-        ///   5. Связывание: на каждый flow → UPDATE NetworkPackets SET FlowId = :id
-        ///      WHERE id IN (packet_indices_для_этого_flow)
-        /// </summary>
+        // POST /api/import/pcap
+        // Импорт .pcap файла:
+        //   1. Парсинг → List&lt;RawPacket&gt;
+        //   2. Построение flows через Python → List&lt;FlowFeaturesDto&gt;
+        //   3. Сохранение пакетов в NetworkPackets (id присваиваются БД)
+        //   4. Сохранение flows в FlowMetrics (id присваиваются БД)
+        //   5. Связывание: на каждый flow → UPDATE NetworkPackets SET FlowId = :id
+        //      WHERE id IN (packet_indices_для_этого_flow)
+
         [HttpPost("pcap")]
-        [RequestSizeLimit(2L * 1024 * 1024 * 1024)]                  // 2 GB
+        [RequestSizeLimit(2L * 1024 * 1024 * 1024)] // 2 GB
         [RequestFormLimits(MultipartBodyLengthLimit = 2L * 1024 * 1024 * 1024)]
         [ProducesResponseType(typeof(PcapImportResultDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -108,7 +107,7 @@ namespace TrafficAnalysisAPI.Controllers
                 // === 5. Сохранение пакетов ===
                 // Важно: сохраняем пакеты в ТОМ ЖЕ ПОРЯДКЕ что и в rawPackets,
                 // чтобы позиция [i] в savedPackets соответствовала позиции [i]
-                // в rawPackets. Потом Python-индексы PacketIndices ссылаются на эти позиции.
+                // в rawPackets. Потом Python-индексы PacketIndices ссылаются на эти позиции
                 var savedPackets = new List<NetworkPacket>(rawPackets.Count);
                 foreach (var raw in rawPackets)
                 {
@@ -207,10 +206,9 @@ namespace TrafficAnalysisAPI.Controllers
             }
         }
 
-        /// <summary>
-        /// Маппинг из FlowFeaturesDto (приходит от Python) в FlowMetrics (Entity для БД).
-        /// Все ~78 полей переносятся 1:1 по имени.
-        /// </summary>
+        // Маппинг из FlowFeaturesDto (приходит от Python) в FlowMetrics (Entity для БД)
+        // Все ~78 полей переносятся 1:1 по имени
+
         private FlowMetrics MapFlowDtoToEntity(FlowFeaturesDto f, int sessionId)
         {
             return new FlowMetrics

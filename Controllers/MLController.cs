@@ -6,19 +6,20 @@ using System.Text.Json;
 using TrafficAnalysisAPI.Data;
 using TrafficAnalysisAPI.DTOs.ML;
 using TrafficAnalysisAPI.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 
 namespace TrafficAnalysisAPI.Controllers
 {
-    /// <summary>
-    /// Flow-level ML-аналитика:
-    ///   - feature-selection: локальный силуэт на сессии
-    ///   - flow-analyze:      модель (rf или catboost) на FlowMetrics
+
+    // Flow-level ML-аналитика:
+    //   - feature-selection: локальный силуэт на сессии
+    //   - flow-analyze:      модель (rf или catboost) на FlowMetrics
     ///   - compare:           A/B сравнение обеих моделей
-    ///   - model-meta:        что внутри global_features.json / catboost_features.json
-    /// </summary>
+    //   - model-meta:        что внутри global_features.json / catboost_features.json
+
     [Route("api/[controller]")]
     [ApiController]
-    // [Authorize(Policy = "AdminOnly")]
+    [Authorize(Policy = "AdminOnly")] //!
     public class MLController : ControllerBase
     {
         private readonly ApplicationDbContext _context;

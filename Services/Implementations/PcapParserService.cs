@@ -4,14 +4,12 @@ using SharpPcap.LibPcap;
 
 namespace TrafficAnalysisAPI.Services.Implementations
 {
-    /// <summary>
-    /// Один пакет, извлечённый из .pcap файла.
-    /// Содержит все поля, необходимые для построения flow-метрик на стороне Python.
-    ///
-    /// Важно: поля в PascalCase — System.Text.Json по умолчанию сериализует их
-    /// в camelCase при отправке в Python, а на стороне Python мы уже умеем читать
-    /// и то и другое через _get_field().
-    /// </summary>
+    // Один пакет, извлечённый из .pcap файла.
+    // Содержит все поля, необходимые для построения flow-метрик на стороне Python.
+    // Важно: поля в PascalCase — System.Text.Json по умолчанию сериализует их
+    // в camelCase при отправке в Python, а на стороне Python мы уже умеем читать
+    // и то и другое через _get_field().
+
     public class RawPacket
     {
         public double TimestampSec { get; set; }   // Unix timestamp в секундах (double для микросекунд)
@@ -42,10 +40,8 @@ namespace TrafficAnalysisAPI.Services.Implementations
 
     public interface IPcapParserService
     {
-        /// <summary>
-        /// Читает .pcap файл и возвращает список пакетов с извлечёнными полями.
-        /// TCP/UDP парсится полностью, остальные протоколы с базовыми полями.
-        /// </summary>
+        // Читает .pcap файл и возвращает список пакетов с извлечёнными полями.
+        // TCP/UDP парсится полностью, остальные протоколы с базовыми полями.
         List<RawPacket> ParsePcapFile(string filePath);
     }
 
@@ -103,10 +99,8 @@ namespace TrafficAnalysisAPI.Services.Implementations
             return result;
         }
 
-        /// <summary>
-        /// Извлекает нужные поля из одного пакета. Возвращает null если пакет
-        /// не IP (ARP, STP и т.д.) — такие нам не интересны для flow-анализа.
-        /// </summary>
+        // Извлекает нужные поля из одного пакета. Возвращает null если пакет
+        // не IP (ARP, STP и т.д.) — такие нам не интересны для flow-анализа.
         private RawPacket? ExtractPacket(PacketCapture capture)
         {
             var rawData = capture.Data;

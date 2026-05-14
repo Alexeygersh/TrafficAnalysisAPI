@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrafficAnalysisAPI.Data;
@@ -5,13 +6,12 @@ using TrafficAnalysisAPI.Models;
 
 namespace TrafficAnalysisAPI.Controllers
 {
-    /// <summary>
-    /// Endpoint для получения данных одного потока (flow) и его пакетов.
-    /// Используется страницей flow-detail на фронтенде.
-    /// </summary>
+
+    // Endpoint для получения данных одного потока (flow) и его пакетов
+    // Используется страницей flow-detail на фронтенде
     [Route("api/[controller]")]
     [ApiController]
-    // [Authorize(Policy = "AuthorizedUser")]
+    [Authorize(Policy = "AuthorizedUser")] //!
     public class FlowsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -25,10 +25,9 @@ namespace TrafficAnalysisAPI.Controllers
             _logger = logger;
         }
 
-        /// <summary>
-        /// GET /api/flows/{id}
-        /// Полные данные одного flow с привязанными метриками.
-        /// </summary>
+        // GET /api/flows/{id}
+        // Полные данные одного flow с привязанными метриками
+
         [HttpGet("{id:int}")]
         [ProducesResponseType(typeof(FlowMetrics), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -45,10 +44,9 @@ namespace TrafficAnalysisAPI.Controllers
             return Ok(flow);
         }
 
-        /// <summary>
-        /// GET /api/flows/{id}/packets
-        /// Пакеты которые входят в этот flow (через FlowId связь).
-        /// </summary>
+        // GET /api/flows/{id}/packets
+        // Пакеты которые входят в этот flow (через FlowId связь)
+
         [HttpGet("{id:int}/packets")]
         [ProducesResponseType(typeof(List<NetworkPacket>), StatusCodes.Status200OK)]
         public async Task<ActionResult<List<NetworkPacket>>> GetFlowPackets(int id)
@@ -67,10 +65,9 @@ namespace TrafficAnalysisAPI.Controllers
             return Ok(packets);
         }
 
-        /// <summary>
-        /// GET /api/flows/by-session/{sessionId}
-        /// Все flows одной сессии (компактный список — для табличного отображения).
-        /// </summary>
+        // GET /api/flows/by-session/{sessionId}
+        // Все flows одной сессии (компактный список — для табличного отображения)
+
         [HttpGet("by-session/{sessionId:int}")]
         public async Task<ActionResult<List<FlowSummaryDto>>> GetFlowsBySession(int sessionId)
         {
@@ -97,9 +94,7 @@ namespace TrafficAnalysisAPI.Controllers
             return Ok(flows);
         }
 
-        /// <summary>
-        /// Лёгкий DTO для списка flows. Без всех 78 признаков.
-        /// </summary>
+        // Лёгкий DTO для списка flows. Без всех 78 признаков.
         public class FlowSummaryDto
         {
             public int Id { get; set; }

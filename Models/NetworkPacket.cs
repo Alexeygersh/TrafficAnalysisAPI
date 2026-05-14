@@ -3,10 +3,10 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TrafficAnalysisAPI.Models
 {
-    /// <summary>
-    /// Сетевой пакет. Привязан к сессии (SessionId) и, если разобран
-    /// из .pcap и попал во flow — к FlowMetrics (FlowId).
-    /// </summary>
+
+    // Сетевой пакет. Привязан к сессии (SessionId) и, если разобран
+    // из .pcap и попал во flow — к FlowMetrics (FlowId)
+
     public class NetworkPacket
     {
         [Key]
@@ -37,18 +37,16 @@ namespace TrafficAnalysisAPI.Models
         [ForeignKey("SessionId")]
         public TrafficSession? Session { get; set; }
 
-        /// <summary>
-        /// ID потока (FlowMetrics) к которому принадлежит пакет.
-        /// Null для пакетов вне flow (например, ARP, ICMPv6 пакеты без IP-payload).
-        /// </summary>
+        // ID потока (FlowMetrics) к которому принадлежит пакет
+        // Null для пакетов вне flow (например, ARP, ICMPv6 пакеты без IP-payload)
         public int? FlowId { get; set; }
 
         [ForeignKey("FlowId")]
         public FlowMetrics? Flow { get; set; }
 
         // --- Бизнес-логика: расчёт threat score для пакета ---
-        // Оставляем минимальную логику для фильтров/сортировки в UI пакетов.
-        public double CalculateThreatScore()
+        // Оставляем минимальную логику для фильтров/сортировки в UI пакетов
+        public double CalculateThreatScore() // !!!
         {
             double score = 0;
 

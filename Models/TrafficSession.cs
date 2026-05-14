@@ -3,11 +3,10 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TrafficAnalysisAPI.Models
 {
-    /// <summary>
-    /// Сессия мониторинга трафика. Одна сессия = один импорт .pcap
-    /// (или набор связанных пакетов). Содержит коллекции NetworkPackets
-    /// и FlowMetrics.
-    /// </summary>
+
+    // Сессия мониторинга трафика. Одна сессия = один импорт .pcap (или набор связанных пакетов)
+    // Содержит коллекции NetworkPackets и FlowMetrics
+
     public class TrafficSession
     {
         [Key]
@@ -42,7 +41,7 @@ namespace TrafficAnalysisAPI.Models
 
         // --- Бизнес-логика ---
 
-        public void AddPacket(NetworkPacket packet)
+        public void AddPacket(NetworkPacket packet) // !!!
         {
             if (EndTime.HasValue)
                 throw new InvalidOperationException(
